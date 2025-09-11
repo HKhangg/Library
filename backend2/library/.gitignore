@@ -32,4 +32,6 @@ build/
 ### VS Code ###
 .vscode/
 frontend-user/public/images/test.webp
-node_modules/
+
+/node_modules/
+
