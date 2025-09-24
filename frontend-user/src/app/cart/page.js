@@ -74,28 +74,22 @@ const Page = () => {
   const user = JSON.parse(localStorage.getItem("persist:root")); // lấy thông tin người dùng từ localStorage
   let cartId = "";
 
-  const fetchMaxAllowed = async () => {
+const fetchMaxAllowed = async () => {
     try {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/settings`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            maxBorrowedBooks: maxBorrowedBooks,
-          }),
-        }
-      );
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/settings`);
       if (!res.ok) throw new Error("Không thể tải cài đặt.");
+
       const result = await res.json();
-      setMaxAllowed(result?.maxBorrowedBooks ? result?.maxBorrowedBooks : 5);
+   
+      setMaxAllowed(result.maxBorrowedBooks);
     } catch (error) {
       console.error("Lỗi khi lấy cài đặt:", error);
-      setMaxAllowed(5); // Mặc định là 5 nếu có lỗi
+      setMaxAllowed(5); 
+    } finally {
+      setLoading(false);
     }
   };
+
   useEffect(() => {
     fetchMaxAllowed(); // Lấy số lượng sách tối đa được mượn
   }, []);
