@@ -1,4 +1,5 @@
 package com.library_web.library.controller;
+import org.springframework.beans.factory.annotation.Value;
 
 import com.library_web.library.dto.UserDTO;
 import com.library_web.library.model.User;
@@ -34,6 +35,22 @@ public class AuthController {
 
     @Autowired
     private FacebookAuthService facebookAuthService;
+    @Value("${spring.security.oauth2.client.registration.google.redirect-uri}")
+    private String redirectUri;
+
+    @Value("${spring.security.oauth2.client.registration.google.client-id}")
+    private String googleClientId;
+
+    @GetMapping("/auth/google/url")
+    public Map<String, String> getGoogleAuthUrl() {
+        String scope = "email profile";
+        String authUrl = "https://accounts.google.com/o/oauth2/v2/auth?" +
+                "client_id=" + googleClientId +
+                "&redirect_uri=" + redirectUri +
+                "&response_type=code" +
+                "&scope=" + scope;
+        return Map.of("url", authUrl);
+    }
 
     @PostMapping("/register")
     public Map<String, String> register(@RequestBody UserDTO userDTO) {
