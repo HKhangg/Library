@@ -14,59 +14,40 @@ const StatusIndicator = ({ status }) => {
       dotClass = "bg-green-400";
   }
   return (
-    <div className="flex gap-1.5 justify-center items-center self-start px-2 py-1 rounded bg-slate-200">
-      <span className="self-stretch my-auto text-sm font-medium text-[#062D76]">
-        {label}
-      </span>
-      <div className="self-stretch my-auto w-4">
-        <div className={`flex shrink-0 w-4 h-4 ${dotClass} rounded-full`} />
+    <div
+      className="flex gap-1.5 justify-center items-center self-start px-2 py-1 rounded 
+                 bg-[#f0f0f0] dark:bg-gray-700 
+                 transition-colors duration-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+    >
+      <span className="text-sm font-medium text-gray-900 dark:text-white">{label}</span>
+      <div className="w-4 h-4">
+        <div className={`w-4 h-4 ${dotClass} rounded-full`} />
       </div>
     </div>
   );
 };
 
-const BookCard = ({
-  id,
-  imageSrc,
-  status,      // thay prop `available` bằng `status`
-  title,
-  author,
-  publisher,
-  borrowCount,
-}) => {
+const BookCard = ({ id, imageSrc, status, title, author, publisher, borrowCount }) => {
   const router = useRouter();
-  const handleCardClick = () => {
-    router.push(`/book-detail/${id}`);
-  };
+  const handleCardClick = () => router.push(`/book-detail/${id}`);
 
   return (
     <article
-      className="flex grow shrink gap-3 min-w-60 cursor-pointer"
-      onClick={handleCardClick}
-    >
-      <img
-        src={imageSrc}
-        alt={title}
-        className="object-cover shrink rounded-sm aspect-[0.67] w-[100px]"
-      />
-      <div className="flex flex-col flex-1 shrink self-end basis-0">
-        {/* Hiển thị badge 3 trạng thái */}
-        <StatusIndicator status={status} />
+  onClick={handleCardClick}
+  className="flex gap-3 min-w-60 cursor-pointer p-3 rounded-xl 
+             bg-white dark:bg-gray-800 border border-[#e4e4e4] dark:border-gray-700 
+             shadow-md hover:shadow-xl transition-all duration-300"
+>
+  <img src={imageSrc} alt={title} className="object-cover w-[100px] rounded-md aspect-[0.67]" />
+  <div className="flex flex-col flex-1 gap-2">
+    <StatusIndicator status={status} />
+    <h3 className="text-lg font-medium text-gray-900 dark:text-white">{title}</h3>
+    <p className="text-base text-gray-800 dark:text-gray-200">Tác giả: {author}</p>
+    <p className="text-base text-gray-800 dark:text-gray-200">NXB: {publisher}</p>
+    <p className="text-base text-gray-800 dark:text-gray-200">Lượt mượn: {borrowCount}</p>
+  </div>
+</article>
 
-        <h3 className="flex-1 shrink gap-2.5 self-stretch mt-2 w-full text-[1.125rem] font-medium text-black basis-0">
-          {title}
-        </h3>
-        <p className="flex-1 shrink gap-2.5 self-stretch mt-2 w-full text-base text-black basis-0">
-          Tác giả: {author}
-        </p>
-        <p className="flex-1 shrink gap-2.5 self-stretch mt-2 w-full text-base text-black basis-0">
-          NXB: {publisher}
-        </p>
-        <p className="flex-1 shrink gap-2.5 self-stretch mt-2 w-full text-base text-black basis-0">
-          Lượt mượn: {borrowCount}
-        </p>
-      </div>
-    </article>
   );
 };
 
