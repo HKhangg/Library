@@ -3,217 +3,135 @@ import React, { useState, useEffect } from "react";
 import LeftSideBar from "../components/LeftSideBar";
 import BookCard from "./book";
 import axios from "axios";
-const books = [
-  {
-    id: "DRPN001",
-    imageSrc:
-      "https://cdn.builder.io/api/v1/image/assets/TEMP/9b777cb3ef9abb920d086e97e27ac4f6f3559695",
-    available: true,
-    title: "Nam cao",
-    author: "Văn học",
-    publisher: "Văn học Việt Nam (2019)",
-    borrowCount: 120,
-  },
-  {
-    id: "DRPN002",
-    imageSrc:
-      "https://cdn.builder.io/api/v1/image/assets/TEMP/fc01b7cf44e0ca2f23258dcc0ad69329b2612af0?placeholderIfAbsent=true&apiKey=d911d70ad43c41e78d81b9650623c816",
-    available: false,
-    title: "Nam cao",
-    author: "Văn học",
-    publisher: "Văn học Việt Nam (2019)",
-    borrowCount: 120,
-  },
-  {
-    id: "DRPN003",
-    imageSrc:
-      "https://cdn.builder.io/api/v1/image/assets/TEMP/5e8a0f3fd4681a9512313c2c1c6dae1285bcf0a6?placeholderIfAbsent=true&apiKey=d911d70ad43c41e78d81b9650623c816",
-    available: true,
-    title: "Nam cao",
-    author: "Văn học",
-    publisher: "Văn học Việt Nam (2019)",
-    borrowCount: 120,
-  },
-  {
-    id: "DRPN004",
-    imageSrc:
-      "https://cdn.builder.io/api/v1/image/assets/TEMP/d854294877ea4263cf3494a98eecfd64cd148327?placeholderIfAbsent=true&apiKey=d911d70ad43c41e78d81b9650623c816",
-    available: false,
-    title: "Nam cao",
-    author: "Văn học",
-    publisher: "Văn học Việt Nam (2019)",
-    borrowCount: 120,
-  },
-  {
-    id: "DRPN005",
-    imageSrc:
-      "https://cdn.builder.io/api/v1/image/assets/TEMP/acf848c9260bfc86d1f9094e17e14ec25f3ec193?placeholderIfAbsent=true&apiKey=d911d70ad43c41e78d81b9650623c816",
-    available: true,
-    title: "Nam cao",
-    author: "Văn học",
-    publisher: "Văn học Việt Nam (2019)",
-    borrowCount: 120,
-  },
-  {
-    id: "DRPN006",
-    imageSrc:
-      "https://cdn.builder.io/api/v1/image/assets/TEMP/d854294877ea4263cf3494a98eecfd64cd148327?placeholderIfAbsent=true&apiKey=d911d70ad43c41e78d81b9650623c816",
-    available: false,
-    title: "Nam cao",
-    author: "Văn học",
-    publisher: "Văn học Việt Nam (2019)",
-    borrowCount: 120,
-  },
-];
+import { ThreeDot } from "react-loading-indicators";
 
 const Page = () => {
   const [selected, setSelected] = useState([]);
   const [maxAllowed, setMaxAllowed] = useState(null);
-  const [books, setBooks] = useState(""); // Giỏ hàng
-  const [loading, setLoading] = useState(true); // Trạng thái loading
-  const user = JSON.parse(localStorage.getItem("persist:root")); // lấy thông tin người dùng từ localStorage
+  const [books, setBooks] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const user = JSON.parse(localStorage.getItem("persist:root"));
   let cartId = "";
 
-const fetchMaxAllowed = async () => {
+  const fetchMaxAllowed = async () => {
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/settings`);
       if (!res.ok) throw new Error("Không thể tải cài đặt.");
-
       const result = await res.json();
-   
       setMaxAllowed(result.maxBorrowedBooks);
     } catch (error) {
       console.error("Lỗi khi lấy cài đặt:", error);
-      setMaxAllowed(5); 
+      setMaxAllowed(5);
+    } 
+  };
+
+
+  const fetchCart = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/cart/${user.id}`);
+      if (response.ok) {
+        const data = await response.json();
+        cartId = data.data.id;
+        setBooks(Array.isArray(data.data) ? data.data : []);
+      }
+      else {
+        console.error("Lỗi khi lấy giỏ hàng");
+        setBooks([]);
+      }
+    } catch (error) {
+      console.error(error);
+      setBooks([]);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchMaxAllowed(); // Lấy số lượng sách tối đa được mượn
-  }, []);
-  // Lấy giỏ hàng từ API theo userId
-  const fetchCart = async () => {
-    try {
-      setLoading(true); // Bắt đầu tải dữ liệu
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/cart/${user.id}` // Endpoint API lấy giỏ hàng theo userId
-      ); // Endpoint API lấy giỏ hàng theo userId
-
-      if (response.ok) {
-        const data = await response.json();
-        cartId = data.data.id;
-        console.log(data.data);
-        setBooks(data.data); // Giả sử API trả về đối tượng có key 'books'
-      } else {
-        console.error("Lỗi khi lấy giỏ hàng");
-      }
-    } catch (error) {
-      console.error("Có lỗi xảy ra:", error);
-    } finally {
-      setLoading(false); // Hoàn tất việc gọi API
+useEffect(() => {
+    if (!user?.id) {
+      setBooks([]);
+      setLoading(false);
+      return;
     }
-  };
-
-  useEffect(() => {
+    fetchMaxAllowed();
     fetchCart();
-  }, [user.id]);
+  }, [user?.id]);
 
-  // tick / bỏ tick 1 cuốn
-  const toggleBook = (idx, checked) => {
-    setSelected((prev) =>
-      checked ? [...prev, idx] : prev.filter((i) => i !== idx)
-    );
+  const toggleBook = (bookId, checked) => {
+    setSelected((prev) => (checked ? [...prev, bookId] : prev.filter((i) => i !== bookId)));
   };
 
-  // tick / bỏ tick tất cả
   const allChecked = selected.length === books?.length;
-  const toggleAll = (checked) =>
-    setSelected(checked ? books.map((_, i) => i) : []);
+ const toggleAll = (checked) => setSelected(checked ? books.map((b) => b.bookId) : []);
 
-  // Xóa sách trong giỏ hàng
   const handleDeleteBooks = async () => {
-    console.log("id", cartId);
-    console.log("id sach", selected);
     try {
-      const response = await axios.delete(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/cart/${user.id}/remove/books`, // Endpoint API xóa sách trong giỏ hàng
-        {
-          data: selected,
-        }
-      );
+      await axios.delete(`${process.env.NEXT_PUBLIC_API_URL}/api/cart/${user.id}/remove/books`, {
+        data: selected,
+      });
       fetchCart();
-
-      // setBooks(response.data.data); // Cập nhật lại giỏ hàng sau khi xóa
-      // console.log("Xóa sách thành công:", response.data);
       alert("Xóa sách thành công!");
-      setSelected([]); // Reset lại danh sách đã chọn
+      setSelected([]);
     } catch (error) {
-      console.error("Lỗi khi xóa sách:", error);
+      console.error(error);
       alert("Đã có lỗi khi xóa sách!");
     }
   };
 
-  // Đăng ký mượn sách
   const handleBorrowBooks = async () => {
     try {
-      const booksInCart = selected; // Các sách đã chọn trong giỏ hàng
-      // console.log(booksInCart);
-      // Gửi yêu cầu đến backend để tạo phiếu mượn
-      const response = await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/borrow-cards`,
-        {
-          userId: user.id,
-          borrowedBooks: booksInCart.map((bookId) => ({
-            bookId: bookId,
-            childBookId: null,
-          })),
-          borrowDate: new Date().toISOString(),
-          status: "REQUESTED",
-          dueDate: new Date(
-            new Date().setDate(new Date().getDate() + 14)
-          ).toISOString(), // Ngày trả sách là 14 ngày sau
-        }
-      );
-
-      // Kiểm tra phản hồi từ backend
+      const booksInCart = selected;
+      const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/borrow-cards`, {
+        userId: user.id,
+        borrowedBooks: booksInCart.map((bookId) => ({ bookId, childBookId: null })),
+        borrowDate: new Date().toISOString(),
+        status: "REQUESTED",
+        dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+      });
 
       if (response.status === 200) {
         alert("Phiếu mượn đã được tạo!");
-        console.log(response.data); // Xem chi tiết phiếu mượn
-
-        const deleteResponse = await axios.delete(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/cart/${user.id}/remove/books`,
-          {
-            data: booksInCart,
-          }
-        );
-
-        console.log(deleteResponse.data); // Xem sách đã xóa khỏi giỏ hàng
+        await axios.delete(`${process.env.NEXT_PUBLIC_API_URL}/api/cart/${user.id}/remove/books`, {
+          data: booksInCart,
+        });
         window.location.href = "/borrowed-card";
-      } else {
-        alert("Không thể tạo phiếu mượn");
-      }
+      } else alert("Không thể tạo phiếu mượn");
     } catch (error) {
-      console.error("Lỗi gọi API mượn quá sách:", error);
+      console.error(error);
       alert("Bạn đã vượt quá số lượng sách mượn tối đa hoặc có lỗi xảy ra.");
     }
   };
+
   const exceedLimit = selected.length > maxAllowed;
 
   return (
-    <div className="flex flex-col min-h-screen text-foreground">
+    <div className="flex flex-col min-h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
       <main className="pt-16 flex">
         <LeftSideBar />
-        <section className="self-stretch pr-[1.25rem] md:pl-64 ml-[1.25rem] my-auto w-full max-md:max-w-full mt-2">
-          <div className="flex flex-col p-5 w-full bg-white rounded-xl max-md:max-w-full">
-            <div className="flex items-center justify-center gap-3">
-              <h2 className="gap-2.5 self-center px-[1.25rem] py-[0.625rem] text-[1.5rem] text-[#062D76] font-semibold rounded-lg">
+        <section className="self-stretch pr-5 md:pl-64 ml-5 my-auto w-full max-md:max-w-full mt-4 ">
+          <div className="flex flex-col p-5 w-full bg-white dark:bg-gray-800 rounded-xl transition-colors duration-300">
+            <div className="flex items-center justify-center mt-0 gap-1">
+              <h2 className="gap-2.5 self-center px-5 py-2 text-[2rem] font-extrabold font-lora rounded-lg text-[#30c9e8] dark:text-[#30c9e8]">
                 Giỏ sách
               </h2>
             </div>
-            <div className="grid grid-cols-1 max-sm:grid-cols-1 gap-5 items-start mt-5 w-full max-md:max-w-full">
+
+              {loading ? (
+              <div className="flex justify-center items-center h-[300px]">
+                <ThreeDot
+                  color="#30c9e8"
+                  size="large"
+                  text="Đang tải sách..."
+                  variant="bounce"
+                  textColor="#30c9e8"
+                />
+              </div>
+            ) : !loading && books.length === 0 ? (
+              <p className="text-center text-gray-500 dark:text-gray-400 py-10">
+                Giỏ sách trống, hãy thêm sách để mượn nhé 📚
+              </p>
+            ) : (
+            <div className="grid grid-cols-1 max-sm:grid-cols-1 gap-5 items-start mt-5 w-full max-md:max-w-full z-10">
               {Array.isArray(books) &&
                 books.map((book, index) => (
                   <BookCard
@@ -231,12 +149,21 @@ const fetchMaxAllowed = async () => {
                     borrowCount={book.soLuongMuon}
                     checked={selected.includes(book.bookId)}
                     onCheck={(c) => toggleBook(book.bookId, c)}
+                    hoverEffect={true} 
+     
                   />
                 ))}
             </div>
+           )}
           </div>
+
           {selected.length > 0 && (
-            <footer className="fixed bottom-0 self-stretch mr-[1.25rem] md:left-64 ml-[1.25rem] right-0 bg-[#E6EAF1] shadow-lg p-4 flex justify-between">
+           <footer className="fixed bottom-0 self-stretch mr-5 md:left-64 ml-5 right-0 
+              bg-blue-50 dark:bg-gray-800/80 backdrop-blur-md shadow-lg 
+              p-4 flex justify-between items-center rounded-t-xl 
+              transition-all duration-300 border-t border-gray-300 dark:border-gray-600 z-20">
+              
+              {/* Checkbox chọn tất cả */}
               <div className="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -244,21 +171,29 @@ const fetchMaxAllowed = async () => {
                   checked={allChecked}
                   onChange={(e) => toggleAll(e.target.checked)}
                 />
-                <span className="text-sm font-medium text-[#062D76]">
+                <span className="text-sm font-medium text-[#062D76] dark:text-[#30c9e8]">
                   Chọn tất cả ({books.length})
                 </span>
               </div>
-              <div className="flex items-center gap-2">
+
+              {/* Nút hành động */}
+              <div className="flex items-center gap-3">
                 <button
                   onClick={handleDeleteBooks}
-                  className="px-4 py-2 bg-[#F44336] hover:bg-[#FFA9A2] text-white rounded cursor-pointer"
+                  className="px-5 py-2.5 rounded-xl border border-transparent 
+                    bg-gradient-to-r from-[#F7302E] to-[#F44336] 
+                    text-white font-medium shadow-sm hover:brightness-110 
+                    hover:scale-[1.03] active:scale-95 transition-all duration-300"
                 >
                   Xóa sách ({selected.length})
                 </button>
 
                 <button
                   onClick={handleBorrowBooks}
-                  className="px-4 py-2 bg-[#062D76] text-white rounded cursor-pointer hover:bg-[#6C8299] transition duration-200 ease-in-out"
+                  className="px-5 py-2.5 rounded-xl border border-transparent 
+                    bg-gradient-to-r from-[#062D76] to-[#0a3c9d]
+                    text-white font-medium shadow-sm hover:brightness-110 
+                    hover:scale-[1.03] active:scale-95 transition-all duration-300"
                 >
                   Đăng ký mượn ({selected.length})
                 </button>

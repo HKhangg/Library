@@ -27,7 +27,6 @@ const StatusIndicator = ({ status }) => {
 const BookRecommend = ({
   id,
   imageSrc,
-  //status chị thêm điều kiện status còn thì hiển thị nhe chị
   title,
   author,
 }) => {

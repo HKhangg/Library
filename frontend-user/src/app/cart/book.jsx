@@ -3,8 +3,8 @@ import React from "react";
 import { useRouter } from "next/navigation";
 
 const StatusIndicator = ({ available }) => (
-  <div className="flex gap-1.5 justify-center items-center self-start px-2 py-1 rounded bg-slate-200">
-    <span className="text-sm font-medium text-[#062D76] w-fit">
+  <div className="flex gap-1.5 justify-center items-center self-start px-2 py-1 rounded bg-slate-200 dark:bg-gray-700 transition-colors duration-300">
+    <span className="text-sm font-medium text-[#062D76] dark:text-[#30c9e8] w-fit">
       {available ? "Còn sẵn" : "Đã hết"}
     </span>
     <div
@@ -24,7 +24,9 @@ const BookCard = ({
   publisher,
   borrowCount,
   checked = false,          
-  onCheck = () => {},        
+  onCheck = () => {},
+  hoverEffect = true,      
+  showThreeDot = false,    
 }) => {
   const router = useRouter();
 
@@ -37,18 +39,19 @@ const BookCard = ({
       .replace(/^-+/, "")
       .replace(/-+$/, "");
 
-  /** Khi click vào card (trừ checkbox) */
+
   const handleCardClick = () => {
     router.push(`/book-detail/${id}`);
   };
 
-  /** Ngăn click checkbox lan ra thẻ <article> */
+
   const stopPropagation = (e) => e.stopPropagation();
 
   return (
     <article
-      className="relative flex gap-5 min-w-60 rounded-2xl py-5 shadow-sm "
-  
+      className={`relative flex gap-5 min-w-60  rounded-2xl py-5 bg-blue-50 dark:bg-gray-600 transition-transform duration-300 shadow-sm hover:shadow-xl ${
+        hoverEffect ? "hover:scale-105 hover:brightness-105 cursor-pointer" : ""
+      }`}
     >
       {/* Checkbox */}
       <input
@@ -59,28 +62,34 @@ const BookCard = ({
         onClick={stopPropagation}
       />
 
+      {/* Image */}
       <img
         src={imageSrc}
         alt={title}
-        className="ml-12 w-[100px] aspect-[0.67] object-cover rounded-sm cursor-pointer"
+        className="ml-12 w-[100px] aspect-[0.67] object-cover rounded-sm"
         onClick={handleCardClick}
       />
 
-      <div className="flex flex-col flex-1 cursor-pointer" onClick={handleCardClick}>
-      <StatusIndicator available={available} />
-        <h3 className="flex-1 shrink gap-2.5 self-stretch mt-2 w-full text-[1.125rem] font-medium text-black basis-0">
+      {/* Info */}
+      <div className="flex flex-col flex-1">
+        <StatusIndicator available={available} />
+        <h3
+          className="mt-2 w-full text-[1.125rem] font-lora font-bold text-black dark:text-gray-100"
+          onClick={handleCardClick}
+        >
           {title}
         </h3>
-        <p className="flex-1 shrink gap-2.5 self-stretch mt-2 w-full text-base text-black basis-0">
+        <p className="mt-1 text-base text-gray-800 dark:text-gray-300">
           Tác giả: {author}
         </p>
-        <p className="flex-1 shrink gap-2.5 self-stretch mt-2 w-full text-base text-black basis-0">
+        <p className="mt-1 text-base text-gray-800 dark:text-gray-300">
           NXB: {publisher}
         </p>
-        <p className="flex-1 shrink gap-2.5 self-stretch mt-2 w-full text-base text-black basis-0">
+        <p className="mt-1 text-base text-gray-800 dark:text-gray-300">
           Lượt mượn: {borrowCount}
         </p>
       </div>
+
     </article>
   );
 };

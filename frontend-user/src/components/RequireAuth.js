@@ -132,11 +132,12 @@ const RequireAuth = ({ children }) => {
         <main
           style={{
             padding: "0 180px 0 0px",
-            maxWidth: "100%",
-            boxSizing: "border-box",
-            backgroundImage: 'url("/images/bg.png")',
-            backgroundSize: "cover",
-            backgroundPosition: "center",
+    maxWidth: "100%",
+    boxSizing: "border-box",
+    background: "none",      
+    backgroundColor: "transparent", 
+    overflowX: "hidden",   
+           
           }}
         >
           {children}

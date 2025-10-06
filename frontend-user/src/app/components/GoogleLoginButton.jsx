@@ -29,7 +29,7 @@ const GoogleLoginButton = () => {
         );
 
         const data = await res.json();
-        console.log("Response from server:", data); // Log the response for debugging
+        console.log("Response from server:", data); 
 
         if (res.ok && data.status === "OK") {
           localStorage.setItem("accessToken", data.data.accessToken);

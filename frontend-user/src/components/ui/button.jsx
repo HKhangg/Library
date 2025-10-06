@@ -53,3 +53,17 @@ function Button({
 }
 
 export { Button, buttonVariants }
+
+import AnimatedIcon from "./AnimatedIcon"
+
+export default function IconButton({ children, icon, ...props }) {
+  return (
+    <button
+      {...props}
+      className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition"
+    >
+      {icon && <AnimatedIcon src={icon} size={20} />}
+      {children}
+    </button>
+  )
+}

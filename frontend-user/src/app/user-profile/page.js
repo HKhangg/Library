@@ -37,18 +37,21 @@ const DatePickerField = ({ value, onChange }) => {
         selected={startDate}
         onChange={handleDateChange}
         dateFormat="yyyy-MM-dd"
-        className="px-2 py-2 border-black bg-gray-100 text-black text-m font-normal w-full rounded"
+        className="px-2 py-2 border border-black dark:border-gray-600 
+                   bg-gray-100 dark:bg-gray-700 text-black dark:text-gray-100 
+                   text-m font-normal w-full rounded"
         placeholderText="yyyy-mm-dd"
       />
       <Button
-        className="absolute right-2 h-8 w-8 bg-blue-300 hover:bg-blue-400 rounded cursor-pointer"
+        className="absolute right-2 h-8 w-8 bg-blue-300 dark:bg-blue-500 
+                   hover:bg-blue-400 dark:hover:bg-blue-600 rounded cursor-pointer"
         onClick={() =>
           document
             .querySelector(".react-datepicker__input-container input")
             ?.focus()
         }
       >
-        <Calendar className="w-5 h-5" color="white" />
+        <Calendar className="w-5 h-5 text-white" />
       </Button>
     </div>
   );
@@ -62,20 +65,26 @@ const OtpInput = ({ otp, setOtp, onVerifyOtp, isOtpSent }) => {
 
   return (
     <div className="mt-4">
-      <label className="text-black text-l font-medium">Nhập OTP</label>
+      <label className="text-black dark:text-gray-200 text-l font-medium">
+        Nhập OTP
+      </label>
       <div className="flex items-center gap-4">
         <Input
           type="text"
           value={otp}
           onChange={handleOtpChange}
           placeholder="Nhập mã OTP (6 chữ số)"
-          className="px-2.5 py-3.5 border-black bg-gray-100 text-black text-m font-normal w-full rounded"
+          className="px-2.5 py-3.5 border border-black dark:border-gray-600 
+                     bg-gray-100 dark:bg-gray-700 text-black dark:text-gray-100 
+                     text-m font-normal w-full rounded"
           maxLength={6}
           disabled={!isOtpSent}
         />
         <Button
           onClick={onVerifyOtp}
-          className="w-20 p-3 bg-blue-300 rounded-2xl text-white text-l font-medium hover:bg-blue-400"
+          className="w-20 p-3 bg-blue-300 dark:bg-blue-500 rounded-2xl 
+                     text-white text-l font-medium hover:bg-blue-400 
+                     dark:hover:bg-blue-600"
           disabled={otp.length !== 6}
         >
           Xác nhận
@@ -88,7 +97,9 @@ const OtpInput = ({ otp, setOtp, onVerifyOtp, isOtpSent }) => {
 // InfoRow Component (updated to handle DatePicker for birthdate)
 const InfoRow = ({ label, name, value, isEditing, onChange, isDateField }) => (
   <div className="flex flex-col w-[400px] gap-2">
-    <label className="text-sm text-black font-medium">{label}</label>
+    <label className="text-sm text-black dark:text-gray-200 font-medium">
+      {label}
+    </label>
     {isEditing ? (
       name === "birthdate" ? (
         <DatePickerField
@@ -103,17 +114,20 @@ const InfoRow = ({ label, name, value, isEditing, onChange, isDateField }) => (
           name={name}
           value={value || ""}
           onChange={onChange}
-          className="px-2 py-2 border-black bg-gray-100 rounded text-black text-m font-normal"
+          className="px-2 py-2 border border-black dark:border-gray-600 
+                     bg-gray-100 dark:bg-gray-700 rounded text-black 
+                     dark:text-gray-100 text-m font-normal"
         />
       )
     ) : (
-      <div className="px-2 py-2 border-b border-black">
-        <p className="text-black text-m font-normal">{value}</p>
+      <div className="px-2 py-2 border-b border-black dark:border-gray-600">
+        <p className="text-black dark:text-gray-100 text-m font-normal">
+          {value}
+        </p>
       </div>
     )}
   </div>
 );
-
 // StatCard Component (unchanged)
 const StatCard = ({ number, label, onClick }) => (
   <div
@@ -128,7 +142,7 @@ const StatCard = ({ number, label, onClick }) => (
 // Section Component (unchanged)
 const Section = ({ title, children }) => (
   <div className="flex flex-col gap-3 w-full">
-    <div className="bg-slate-200 w-fit text-center px-3 py-2 mt-6 rounded-lg text-sky-900 text-[18px]">
+    <div className="bg-slate-200 dark:bg-gray-600 w-fit text-center px-3 py-2 mt-6 rounded-lg text-sky-900 dark:text-gray-100 text-[18px]">
       {title}
     </div>
     <div className="grid grid-cols-2 gap-5 ml-3">{children}</div>
@@ -431,7 +445,7 @@ const ProfileCard = () => {
   };
 
   return (
-    <div className="p-15 bg-white mx-auto rounded-2xl overflow-y-auto">
+    <div className="p-15 bg-white dark:bg-gray-700 mx-auto rounded-2xl overflow-y-auto">
       {message && (
         <div
           className={`mb-4 p-3 rounded-lg ${
@@ -461,7 +475,7 @@ const ProfileCard = () => {
             </div>
           )}
           <div className="flex flex-col gap-3">
-            <h2 className="text-neutral-900 text-xl font-semibold">
+            <h2 className="text-neutral-900 text-xl font-lora ">
               {formData.fullName}
             </h2>
             <p className="text-neutral-900 text-opacity-50 text-l font-medium">
@@ -548,25 +562,14 @@ const ProfileCard = () => {
           </Button>
         </div>
       )}
-
-      <Section title="Thông tin mượn sách">
-        <div className="flex gap-3">
-          <StatCard
-            number={8}
-            label="Tài liệu đang mượn"
-            onClick={handleBorrowedCard}
-          />
-          <StatCard number={4} label="Tài liệu quá hạn" onClick={handleFine} />
-        </div>
-      </Section>
     </div>
   );
 };
 
 const Page = () => {
   return (
-    <div className="pt-20 pb-4 -mr-[180px] flex flex-1 justify-items-center items-center gap-5">
-      <main className="max-w-7xl mx-auto w-full flex flex-col gap-5">
+    <div className="pt-20 pb-17 -mr-[180px] bg-blue-50 dark:bg-gray-800 flex flex-1 justify-items-center items-center gap-5">
+      <main className="max-w-7xl mx-auto w-full flex flex-col gap-5 z-10 ">
         <ProfileCard />
       </main>
     </div>

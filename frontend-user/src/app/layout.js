@@ -74,7 +74,10 @@ import Header from "./components/Header";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import FacebookSDK from "./components/FacebookSDK";
 // import Sidebar from "./components/LeftSidebar";
-import Providers from "@/components/Providers"; // thêm dòng này
+import Providers from "@/components/Providers"; 
+import Script from "next/script";
+import FloatingIcons from "@/app/components/FloatingIcons";
+
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -94,21 +97,37 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
+       <head>
+        <Script src="https://cdn.lordicon.com/lordicon.js" strategy="beforeInteractive" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700&display=swap"
+          rel="stylesheet"
+        />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Lora:wght@400;700&family=Roboto+Serif:wght@400;700&display=swap"
+          rel="stylesheet"
+        />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased flex`}
       >
+        <div className="z-1">
+         <FloatingIcons />
+         </div>
         <Providers>
           <GoogleOAuthProvider
             clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID}
           >
             <FacebookSDK>
-              <div className="flex-1 bg-[#EFF3FB]">
-                <RequireAuth>{children}</RequireAuth>
-              </div>
+             <div className="w-full min-h-screen bg-white dark:bg-gray-900 transition-colors duration-300">
+              <RequireAuth>{children}</RequireAuth>
+            </div>
+
             </FacebookSDK>
           </GoogleOAuthProvider>
         </Providers>
       </body>
+      
     </html>
   );
 }
