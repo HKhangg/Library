@@ -5,7 +5,9 @@ import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Entity
@@ -66,6 +68,15 @@ public class BorrowCard {
         this.status = Status.EXPIRED.getStatusDescription(); // Đặt trạng thái là "Hết hạn"
       }
     }
+  }
+    public List<Long> getBookIdsAsLong() {
+      if (borrowedBooks == null) {
+          return Collections.emptyList();
+      }
+      return borrowedBooks.stream()
+                          .map(BorrowedBook::getBookId)
+                          .filter(Objects::nonNull)
+                          .collect(Collectors.toList());
   }
 
   public BorrowCard(Long userId, LocalDateTime borrowDate, int waitingToTake, List<BorrowedBook> borrowedBooks) {

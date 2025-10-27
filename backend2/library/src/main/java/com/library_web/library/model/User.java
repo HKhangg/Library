@@ -1,8 +1,11 @@
 package com.library_web.library.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.library_web.library.chat.model.ChatMessage;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonFormat;
@@ -53,6 +56,10 @@ public class User {
 
      @Column(name = "avatar_url" , columnDefinition = "TEXT")
     private String avatar_url;
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
+    private List<ChatMessage> chatMemories = new ArrayList<>();
+
 
     @JsonFormat(pattern = "yyyy-MM-dd")
     @Column(name = "joined_date")

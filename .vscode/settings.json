@@ -1,7 +1,3 @@
 {
-  "java.configuration.updateBuildConfiguration": "interactive",
-  "java.compile.nullAnalysis.mode": "automatic",
-  "java.project.sourcePaths": [
-    "frontend-user/public/images"
-  ]
+    "java.configuration.updateBuildConfiguration": "interactive"
 }

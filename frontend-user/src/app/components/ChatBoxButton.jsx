@@ -1,10 +1,9 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Send, MessageCircleMore, Minus, Maximize, Minimize } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import axios from "axios";
 
-// Icon Chat
 const ChatIcon = () => {
   return (
     <svg
@@ -58,7 +57,6 @@ const ChatIcon = () => {
   );
 };
 
-// Badge thông báo
 const NotificationBadge = ({ count }) => {
   return (
     <div
@@ -71,24 +69,35 @@ const NotificationBadge = ({ count }) => {
   );
 };
 
-// Component ChatBox
 const ChatBotButton = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [messages, setMessages] = useState([
     {
-      sender: "bot",
-      text: "Chào bạn! Tôi là trợ lý thư viện. Hỏi tôi về sách còn hay không, sách mới trong tháng, hoặc sách được yêu thích nhé! 😊",
+      sender: "BOT",
+      text: "Chào bạn! Tui là trợ lý thư viện tên là Hehe. Tui có thể giúp gì cho bạn? 😊",
     },
   ]);
   const [input, setInput] = useState("");
   const [notificationVisible, setNotificationVisible] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const messagesEndRef = React.useRef(null);
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, isLoading]);
 
   const sendMessage = async () => {
-    if (input.trim() === "") return;
+    if (input.trim() === "" || isLoading) return;
+    const userMessageText = input.trim();
+
     const newUserMessage = {
       sender: "user",
-      text: input,
+      text: userMessageText,
       time: new Date().toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit",
@@ -98,22 +107,44 @@ const ChatBotButton = () => {
     setMessages((prev) => [...prev, newUserMessage]);
     setInput("");
     setNotificationVisible(false);
+    setIsLoading(true);
 
     try {
+      const userId = localStorage.getItem("id");
+      const token = localStorage.getItem("accessToken");
+
+      if (!userId || !token) {
+           console.error("Lỗi: Không tìm thấy userId hoặc token trong localStorage.");
+           const authError = {
+                sender: "BOT",
+                text: "Lỗi xác thực. Vui lòng đăng nhập lại.",
+                time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+           };
+           setMessages((prev) => [...prev, authError]);
+           setIsLoading(false);
+           return;
+      }
+
+      const API_URL = "http://localhost:8080/api/chat/message";
+
       const response = await axios.post(
-        "https://thanhtri1904.app.n8n.cloud/webhook/bec2193d-0a8a-4919-87f7-d11507518684",
+        API_URL,
         {
-          message: input,
+          userId: userId,
+          message: userMessageText,
         },
         {
           headers: {
             "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
           },
         }
       );
-      const reply = response.data?.reply || "Không có phản hồi!";
+
+      const reply = response.data.reply || "Không có phản hồi từ trợ lý.";
+
       const newBotMessage = {
-        sender: "bot",
+        sender: "BOT",
         text: reply,
         time: new Date().toLocaleTimeString([], {
           hour: "2-digit",
@@ -122,40 +153,46 @@ const ChatBotButton = () => {
       };
       setMessages((prev) => [...prev, newBotMessage]);
     } catch (error) {
-      console.error("Lỗi khi gọi n8n cloud:", error);
+      console.error("Lỗi khi gọi Backend:", error);
+      let errorText = "Xin lỗi, có lỗi kết nối đến máy chủ.";
+      if (error.response && error.response.status === 401) {
+          errorText = "Phiên đăng nhập hết hạn hoặc không hợp lệ. Vui lòng đăng nhập lại.";
+      } else if (error.response && error.response.data && error.response.data.reply) {
+          errorText = error.response.data.reply;
+      }
+
       const errorMessage = {
-        sender: "bot",
-        text: "Xin lỗi, có lỗi xảy ra. Vui lòng thử lại!",
+        sender: "BOT",
+        text: errorText,
         time: new Date().toLocaleTimeString([], {
           hour: "2-digit",
           minute: "2-digit",
         }),
       };
       setMessages((prev) => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
-    <div className="fixed bottom-4 right-4 flex flex-col items-end">
-      {/* Nút mở chat */}
+    <div className="fixed bottom-4 right-4 flex flex-col items-end z-[9999]">
       <Button
         onClick={() => setIsOpen(!isOpen)}
         className="w-12 h-12 p-0 bg-blue-500 rounded-full flex items-center justify-center hover:opacity-80 hover:bg-blue-600 relative"
       >
         <ChatIcon />
-        {notificationVisible && <NotificationBadge count={1} />}
+        {notificationVisible && !isOpen && <NotificationBadge count={1} />}
       </Button>
 
-      {/* Hộp chat */}
       {isOpen && (
         <div
           className={`${
             isFullScreen
               ? "fixed inset-0 w-full h-full"
               : "fixed bottom-20 right-4 w-80 h-96"
-          } bg-white rounded-xl flex flex-col border-2 border-blue-300`}
+          } bg-white rounded-xl flex flex-col border-2 border-blue-300 shadow-xl`}
         >
-          {/* Header */}
           <div className="flex justify-between items-center p-3 border-b rounded-tl-xl rounded-tr-xl bg-[#E6EAF1]">
             <span className="text-lg font-semibold text-gray-700">
               Trợ lý Thư viện
@@ -180,7 +217,6 @@ const ChatBotButton = () => {
             </div>
           </div>
 
-          {/* Nội dung chat */}
           <div className="flex-1 overflow-y-auto p-3 space-y-2 bg-[#E6EAF1]">
             {messages.map((msg, index) => (
               <div
@@ -189,27 +225,43 @@ const ChatBotButton = () => {
                   msg.sender === "user" ? "justify-end" : "justify-start"
                 }`}
               >
-                <div className="flex flex-col">
-                  <span className="text-xs text-gray-500 mt-1">
-                    {`${msg.sender === "user" ? "Bạn\t" : "Thư viện\t"}${
+                <div className="flex flex-col max-w-[85%]">
+                  <span className={`text-xs text-gray-500 mb-1 ${
+                    msg.sender === "user" ? "text-right" : "text-left"
+                  }`}>
+                    {`${msg.sender === "user" ? "Bạn\t" : "Hehe\t"}${
                       msg.time
                     }`}
                   </span>
                   <div
-                    className={`px-4 py-2 rounded-lg ${
+                    className={`px-4 py-2 rounded-lg break-words ${
                       msg.sender === "user"
-                        ? "bg-blue-500 text-white"
-                        : "bg-white text-gray-700"
+                        ? "bg-blue-500 text-white rounded-br-none"
+                        : "bg-white text-gray-700 rounded-tl-none"
                     }`}
+                    style={{ whiteSpace: "pre-wrap" }}
                   >
                     {msg.text}
                   </div>
                 </div>
               </div>
             ))}
+
+            {isLoading && (
+              <div className="flex justify-start">
+                <div className="flex flex-col">
+                  <span className="text-xs text-gray-500 mb-1">Hehe</span>
+                  <div className="px-4 py-2 rounded-lg bg-white text-gray-700 flex items-center gap-2 rounded-tl-none">
+                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-pulse"></div>
+                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-pulse delay-150"></div>
+                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-pulse delay-300"></div>
+                  </div>
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
           </div>
 
-          {/* Ô nhập tin nhắn */}
           <div className="flex p-2 border-0 bg-white items-center rounded-br-xl rounded-bl-xl">
             <input
               type="text"
@@ -218,12 +270,18 @@ const ChatBotButton = () => {
               onKeyPress={(e) => e.key === "Enter" && sendMessage()}
               placeholder="Nhập câu hỏi của bạn..."
               className="w-full border-0 rounded-xl px-3 py-2 outline-none"
+              disabled={isLoading}
             />
             <Button
               onClick={sendMessage}
               className="ml-2 bg-white text-black px-2 py-2 rounded-lg hover:bg-blue-200"
+              disabled={isLoading || input.trim() === ""}
             >
-              <Send className="w-6 h-6" />
+              {isLoading ? (
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-600"></div>
+              ) : (
+                <Send className="w-6 h-6" />
+              )}
             </Button>
           </div>
         </div>
