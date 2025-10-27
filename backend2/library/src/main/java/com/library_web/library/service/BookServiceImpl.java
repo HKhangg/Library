@@ -7,10 +7,16 @@ import com.library_web.library.model.CategoryChild;
 import com.library_web.library.repository.BookChildRepository;
 import com.library_web.library.repository.BookRepository;
 import com.library_web.library.repository.CategoryRepository;
+
+//import dev.langchain4j.data.embedding.Embedding;
+//import dev.langchain4j.model.embedding.EmbeddingModel;
+
 import com.library_web.library.repository.CategoryChildRepository;
 import com.library_web.library.repository.BorrowCardRepository;
 
 import jakarta.transaction.Transactional;
+
+//import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -27,6 +33,15 @@ public class BookServiceImpl implements BookService {
 
     // private final CategoryRepository categoryRepo;
     private final CategoryChildRepository childRepo;
+    //@Autowired
+    //private EmbeddingModel embeddingModel;
+
+/*     private String buildBookTextForEmbedding(Book b) {
+    StringBuilder sb = new StringBuilder();
+    if (b.getTenSach() != null) sb.append(b.getTenSach()).append(". ");
+    if (b.getTenTacGia() != null) sb.append("Tác giả: ").append(b.getTenTacGia()).append(". ");
+    return sb.toString();
+} */
 
     // private final Long defaultParentId = 1L;
     // public BookServiceImpl(BookRepository repo) { this.repo = repo; }
@@ -115,6 +130,8 @@ public class BookServiceImpl implements BookService {
         CategoryChild child = childRepo.findById(childId)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.BAD_REQUEST, "Không tìm thấy thể loại con với id: " + childId));
+        
+    
         book.setCategoryChild(child);
         book.setTrangThai(Book.TrangThai.CON_SAN);
         Book saved = repo.save(book);
@@ -144,6 +161,7 @@ public class BookServiceImpl implements BookService {
     public Book updateBook(Long maSach, Map<String, Object> updates) {
         try {
             Book book = getBookbyID(maSach);
+         //   boolean needsEmbeddingUpdate = false;
             if (updates == null || updates.isEmpty()) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                         "Không có dữ liệu cập nhật nào được cung cấp.");
@@ -191,7 +209,8 @@ public class BookServiceImpl implements BookService {
                                     "Số lượng bản sách mới phải lớn hơn hoặc bằng 0.");
                         }
 
-                        long activeCount = bookChildRepository.countActiveByBookMaSach(maSach);
+                        List<BookChild.Status> activeStatuses = List.of(BookChild.Status.AVAILABLE, BookChild.Status.BORROWED);
+                        long activeCount = bookChildRepository.countActiveByBookMaSach(maSach, activeStatuses);
                         long totalCount = bookChildRepository.countByBookMaSach(maSach);
                         for (int i = 0; i < newQty; i++) {
                             String suffix = generateSuffix((int) totalCount + i);

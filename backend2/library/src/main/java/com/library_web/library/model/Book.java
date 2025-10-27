@@ -15,6 +15,7 @@ public class Book {
      private Long maSach;
      private String tenSach;
      @Column(length = 10000)
+     
      private String moTa;
      private String tenTacGia;
      private String nxb;
@@ -30,6 +31,9 @@ public class Book {
 
      @Column(name = "created_at", updatable = false)
      private LocalDate createdAt;
+
+   //  @Column(name = "embedding_vector", columnDefinition = "vector(768)") 
+     //private String embeddingVectorString;
 
      @ElementCollection
      // @JsonIgnore
@@ -81,6 +85,46 @@ public class Book {
      public void setMaSach(Long maSach) {
           this.maSach = maSach;
      }
+
+     /* public String getEmbeddingVectorString() {
+        return embeddingVectorString;
+    }
+
+    public void setEmbeddingVectorString(String embeddingVectorString) {
+        this.embeddingVectorString = embeddingVectorString;
+    }
+
+    @Transient 
+    public float[] getEmbeddingVector() {
+        if (this.embeddingVectorString == null || this.embeddingVectorString.isBlank()) {
+            return null;
+        }
+        try {
+
+            String[] items = this.embeddingVectorString.substring(1, this.embeddingVectorString.length() - 1).split(",");
+            float[] result = new float[items.length];
+            for (int i = 0; i < items.length; i++) {
+                result[i] = Float.parseFloat(items[i].trim());
+            }
+            return result;
+        } catch (Exception e) {
+            System.err.println("Lỗi parse embedding vector string cho Book ID " + this.maSach + ": " + this.embeddingVectorString);
+            return null; 
+        }
+    }
+
+
+    public void setEmbeddingVector(float[] vector) {
+        if (vector == null || vector.length == 0) {
+            this.embeddingVectorString = null;
+        } else {
+            this.embeddingVectorString = Arrays.toString(vector);
+        }
+    }
+ */
+
+
+
 
      public String getTenSach() {
           return tenSach;
