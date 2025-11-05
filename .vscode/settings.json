@@ -3,6 +3,5 @@
   "java.compile.nullAnalysis.mode": "automatic",
   "java.project.sourcePaths": [
     "frontend-user/public/images"
-  ],
-  "editor.scrollbar.horizontal": "visible"
+  ]
 }

@@ -1,13 +1,9 @@
 package com.library_web.library.dto;
 
-import lombok.Data;
-
 import java.time.LocalDateTime;
 import java.util.List;
 
-import com.library_web.library.dto.BorrowCardDTO.BookInfo;
 
-@Data
 public class BorrowCardDTO {
   private Long id;
   private Long userId;
@@ -17,10 +13,126 @@ public class BorrowCardDTO {
   private LocalDateTime dueDate;
   private LocalDateTime getBookDate;
   private String status;
-  private int totalBooks; // Số lượng sách mượn
+  private int totalBooks;
+  private Long maSach;
+  private String tenSach;
+
+
+  public BorrowCardDTO() {
+  }
+
+  public BorrowCardDTO(Long id, Long userId, String username, List<BookInfo> bookInfos, LocalDateTime borrowDate,
+      LocalDateTime getBookDate, LocalDateTime dueDate, int bookCount) {
+    this.id = id;
+    this.userId = userId;
+    this.userName = username;
+    this.bookIds = bookInfos;
+    this.borrowDate = borrowDate;
+    this.getBookDate = getBookDate;
+    this.dueDate = dueDate;
+    this.totalBooks = bookCount;
+  }
+
+  public Long getId() {
+    return id;
+  }
+
+  public void setId(Long id) {
+    this.id = id;
+  }
+
+  public Long getUserId() {
+    return userId;
+  }
+
+  public void setUserId(Long userId) {
+    this.userId = userId;
+  }
+
+  public String getUserName() {
+    return userName;
+  }
+
+  public void setUserName(String userName) {
+    this.userName = userName;
+  }
+
+  public List<BookInfo> getBookIds() {
+    return bookIds;
+  }
+
+  public void setBookIds(List<BookInfo> bookIds) {
+    this.bookIds = bookIds;
+  }
+
+  public LocalDateTime getBorrowDate() {
+    return borrowDate;
+  }
+
+  public void setBorrowDate(LocalDateTime borrowDate) {
+    this.borrowDate = borrowDate;
+  }
+
+  public LocalDateTime getDueDate() {
+    return dueDate;
+  }
+
+  public void setDueDate(LocalDateTime dueDate) {
+    this.dueDate = dueDate;
+  }
+
+  public LocalDateTime getGetBookDate() {
+    return getBookDate;
+  }
+
+  public void setGetBookDate(LocalDateTime getBookDate) {
+    this.getBookDate = getBookDate;
+  }
+
+  public String getStatus() {
+    return status;
+  }
+
+  public void setStatus(String status) {
+    this.status = status;
+  }
+
+  public int getTotalBooks() {
+    return totalBooks;
+  }
+
+  public void setTotalBooks(int totalBooks) {
+    this.totalBooks = totalBooks;
+  }
+
+  public Long getMaSach() {
+    return maSach;
+  }
+
+  public void setMaSach(Long maSach) {
+    this.maSach = maSach;
+  }
+
+  public String getTenSach() {
+    return tenSach;
+  }
+
+  public void setTenSach(String tenSach) {
+    this.tenSach = tenSach;
+  }
+
 
   public static class BookInfo {
     private String image;
+    private String name;
+    private String author;
+    private String category;
+    private String publisher;
+    private int borrowCount;
+    private Long maSach;
+
+    public BookInfo() {
+    }
 
     public String getImage() {
       return image;
@@ -30,8 +142,6 @@ public class BorrowCardDTO {
       this.image = image;
     }
 
-    private String name;
-
     public String getName() {
       return name;
     }
@@ -39,11 +149,6 @@ public class BorrowCardDTO {
     public void setName(String name) {
       this.name = name;
     }
-
-    private String author;
-    private String category;
-    private String publisher;
-    private int borrowCount;
 
     public String getAuthor() {
       return author;
@@ -77,6 +182,14 @@ public class BorrowCardDTO {
       this.borrowCount = borrowCount;
     }
 
+    public Long getMaSach() {
+      return maSach;
+    }
+
+    public void setMaSach(Long maSach) {
+      this.maSach = maSach;
+    }
+
     public BookInfo(String image, String bookName, String authorName, String categoryName, String publisher,
         Integer borrowQuantity) {
       this.image = image;
@@ -84,31 +197,7 @@ public class BorrowCardDTO {
       this.author = authorName;
       this.category = categoryName;
       this.publisher = publisher;
-      this.borrowCount = borrowQuantity;
+      this.borrowCount = (borrowQuantity != null) ? borrowQuantity : 0;
     }
   }
-
-  // public BorrowCardDTO(Long id, Long userId, String userName, List<BookInfo> bookIds, LocalDateTime borrowDate,
-  //     LocalDateTime dueDate, LocalDateTime getBookDate, String status) {
-  //   this.id = id;
-  //   this.userId = userId;
-  //   this.userName = userName;
-  //   this.bookIds = bookIds;
-  //   this.borrowDate = borrowDate;
-  //   this.dueDate = dueDate;
-  //   this.getBookDate = getBookDate;
-  //   this.status = status;
-  // }
-
-  public BorrowCardDTO(Long id, Long userId, String username, List<BookInfo> bookInfos, LocalDateTime borrowDate, LocalDateTime getBookDate, LocalDateTime dueDate, int bookCount) {
-        this.id = id;
-        this.userId = userId;
-        this.userName = username;
-        this.bookIds = bookInfos;
-        this.borrowDate = borrowDate;
-        this.getBookDate = getBookDate;
-        this.dueDate = dueDate;
-        this.totalBooks = bookCount;
-    }
-
 }
