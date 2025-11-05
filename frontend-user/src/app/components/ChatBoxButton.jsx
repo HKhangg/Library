@@ -1,6 +1,12 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { Send, MessageCircleMore, Minus, Maximize, Minimize } from "lucide-react";
+import {
+  Send,
+  MessageCircleMore,
+  Minus,
+  Maximize,
+  Minimize,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import axios from "axios";
 
@@ -84,6 +90,20 @@ const ChatBotButton = () => {
   const [input, setInput] = useState("");
   const [notificationVisible, setNotificationVisible] = useState(true);
 
+  // Auto scroll xuống dưới khi có tin nhắn mới
+
+  // Ref để tham chiếu tới vùng hiển thị tin nhắn
+  const listRef = React.useRef(null);
+
+  useEffect(() => {
+    if (listRef.current) {
+      listRef.current.scrollTo({
+        top: listRef.current.scrollHeight,
+        behavior: "smooth",
+      });
+    }
+  }, [messages]);
+
   const sendMessage = async () => {
     if (input.trim() === "") return;
     const newUserMessage = {
@@ -156,20 +176,23 @@ const ChatBotButton = () => {
           } bg-white rounded-xl flex flex-col border-2 border-blue-300`}
         >
           {/* Header */}
-          <div className="flex justify-between items-center p-3 border-b rounded-tl-xl rounded-tr-xl bg-[#E6EAF1]">
-            <span className="text-lg font-semibold text-gray-700">
+          <div className="flex justify-between items-center p-3 border-b rounded-tl-xl rounded-tr-xl bg-[#E6EAF1] dark:bg-[#1A202C]">
+            {/* THAY ĐỔI: Thêm màu chữ cho dark mode */}
+            <span className="text-lg font-semibold text-gray-700 dark:text-gray-200">
               Trợ lý Thư viện
             </span>
             <div className="flex gap-2">
+              {/* THAY ĐỔI: Thêm màu icon cho dark mode */}
               <button
                 onClick={() => setIsOpen(false)}
-                className="text-gray-600 hover:text-gray-800"
+                className="text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white"
               >
                 <Minus className="w-5 h-5" />
               </button>
+              {/* THAY ĐỔI: Thêm màu icon cho dark mode */}
               <button
                 onClick={() => setIsFullScreen(!isFullScreen)}
-                className="text-gray-600 hover:text-gray-800"
+                className="text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white"
               >
                 {isFullScreen ? (
                   <Minimize className="w-5 h-5" />
@@ -179,9 +202,12 @@ const ChatBotButton = () => {
               </button>
             </div>
           </div>
-
+          {/* THAY ĐỔI: Thêm class cho light theme và dark theme để đồng bộ với trang */}
           {/* Nội dung chat */}
-          <div className="flex-1 overflow-y-auto p-3 space-y-2 bg-[#E6EAF1]">
+          <div
+            ref={listRef}
+            className="flex-1 overflow-y-auto p-3 space-y-2 bg-[#E6EAF1] dark:bg-[#10141C]"
+          >
             {messages.map((msg, index) => (
               <div
                 key={index}
@@ -190,7 +216,8 @@ const ChatBotButton = () => {
                 }`}
               >
                 <div className="flex flex-col">
-                  <span className="text-xs text-gray-500 mt-1">
+                  {/* THAY ĐỔI: Thêm màu chữ cho thời gian để dễ đọc trên cả 2 nền */}
+                  <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     {`${msg.sender === "user" ? "Bạn\t" : "Thư viện\t"}${
                       msg.time
                     }`}
@@ -199,7 +226,8 @@ const ChatBotButton = () => {
                     className={`px-4 py-2 rounded-lg ${
                       msg.sender === "user"
                         ? "bg-blue-500 text-white"
-                        : "bg-white text-gray-700"
+                        : // THAY ĐỔI: Thêm màu nền và màu chữ cho tin nhắn của bot để tương phản tốt hơn
+                          "bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200"
                     }`}
                   >
                     {msg.text}
@@ -208,20 +236,21 @@ const ChatBotButton = () => {
               </div>
             ))}
           </div>
-
           {/* Ô nhập tin nhắn */}
-          <div className="flex p-2 border-0 bg-white items-center rounded-br-xl rounded-bl-xl">
+          <div className="flex p-2 border-0 bg-white dark:bg-[#1A202C] items-center rounded-br-xl rounded-bl-xl">
             <input
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyPress={(e) => e.key === "Enter" && sendMessage()}
               placeholder="Nhập câu hỏi của bạn..."
-              className="w-full border-0 rounded-xl px-3 py-2 outline-none"
+              // THAY ĐỔI: Thêm màu nền trong suốt, màu chữ và màu placeholder cho dark mode
+              className="w-full border-0 rounded-xl px-3 py-2 outline-none bg-transparent text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400"
             />
             <Button
               onClick={sendMessage}
-              className="ml-2 bg-white text-black px-2 py-2 rounded-lg hover:bg-blue-200"
+              // THAY ĐỔI: Chỉnh lại màu nền, màu icon và màu khi hover cho dark mode
+              className="ml-2 bg-white dark:bg-transparent text-black dark:text-gray-300 px-2 py-2 rounded-lg hover:bg-blue-200 dark:hover:bg-gray-700"
             >
               <Send className="w-6 h-6" />
             </Button>
