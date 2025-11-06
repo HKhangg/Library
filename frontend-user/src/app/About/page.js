@@ -89,7 +89,7 @@ const teamMembers = [
   {
     img: "/images/Duc.jpg",
     name: "Vòng Việt Đức",
-    mssv: "23521645",
+    mssv: "23520324",
   },
   {
     img: "/images/Bao.jpg",
@@ -99,7 +99,7 @@ const teamMembers = [
   },
   {
     img: "/images/Khang.jpg",
-    name: "Huy Khang",
+    name: "Mai Huy Khang",
     mssv: "23520692",
   },
 ];
