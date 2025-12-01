@@ -23,7 +23,8 @@ import AccountIcon from "./AccountIcon";
 import SearchIcon from "./SearchIcon";
 import { Sun, Moon } from "lucide-react";
 // Header hoặc component cha
-
+// 1. Import hook 'useCart'
+import { useCart } from "@/app/context/CartContext";
 
 const navigation = [
   { name: "Trang chủ", href: "/" },
@@ -62,7 +63,10 @@ const Header = () => {
   const pathname = usePathname();
   const router = useRouter();
 
-  const [cartCount, setCartCount] = useState(0);
+  // const [cartCount, setCartCount] = useState(0);
+
+  const { cartCount } = useCart(); // Lấy cartCount từ Context toàn cục
+
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -258,7 +262,7 @@ const DarkModeToggle = () => {
   }, [readStatus]);
 
   const user = JSON.parse(localStorage.getItem("persist:root")) || { id: "54" };
-
+  /*
   const fetchCart = async () => {
     try {
       const response = await fetch(
@@ -275,7 +279,7 @@ const DarkModeToggle = () => {
       console.error("Có lỗi xảy ra khi lấy giỏ hàng:", error);
     }
   };
-
+  */
   const fetchNotifications = async () => {
     const notificationList = [];
     try {
@@ -392,7 +396,7 @@ const DarkModeToggle = () => {
   };
 
   useEffect(() => {
-    fetchCart();
+    // fetchCart();
     fetchNotifications();
   }, [user.id]);
 
@@ -431,10 +435,11 @@ const DarkModeToggle = () => {
               <div className="flex items-center space-x-6 ml-6">
                 <Link href="/" className="flex items-center">
                   <Image
-                    src="/images/logoN.png"
+                    src="/images/logoB.png"
                     alt="Logo"
                     width={100}
                     height={55}
+                    className="rounded-lg"
                   />
                 </Link>
               </div>

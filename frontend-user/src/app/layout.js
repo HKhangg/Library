@@ -78,6 +78,8 @@ import Providers from "@/components/Providers";
 import Script from "next/script";
 import FloatingIcons from "@/app/components/FloatingIcons";
 
+import { Toaster } from "sonner";
+import { CartProvider } from "./context/CartContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -118,14 +120,20 @@ export default function RootLayout({ children }) {
           <GoogleOAuthProvider
             clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID}
           >
-            <FacebookSDK>
-             <div className="w-full min-h-screen bg-white dark:bg-gray-900 transition-colors duration-300">
-              <RequireAuth>{children}</RequireAuth>
-            </div>
-
-            </FacebookSDK>
+            <CartProvider>
+              <FacebookSDK>
+                <div className="w-full min-h-screen bg-white dark:bg-gray-900 transition-colors duration-300">
+                  <RequireAuth>{children}</RequireAuth>
+                </div>
+              </FacebookSDK>
+            </CartProvider>
+            
           </GoogleOAuthProvider>
         </Providers>
+        {/* Chatbot portal */}
+        <div id="chatbot-portal"></div>
+
+        <Toaster position="top-right" richColors />
       </body>
       
     </html>

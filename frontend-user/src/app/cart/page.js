@@ -5,13 +5,18 @@ import BookCard from "./book";
 import axios from "axios";
 import { ThreeDot } from "react-loading-indicators";
 
+import { toast } from "sonner";
+import { useCart } from "@/app/context/CartContext";
+
 const Page = () => {
   const [selected, setSelected] = useState([]);
   const [maxAllowed, setMaxAllowed] = useState(null);
   const [books, setBooks] = useState([]);
   const [loading, setLoading] = useState(true);
   const user = JSON.parse(localStorage.getItem("persist:root"));
+  
   let cartId = "";
+  const { fetchCart: fetchCartCount } = useCart();
 
   const fetchMaxAllowed = async () => {
     try {
@@ -65,20 +70,23 @@ useEffect(() => {
  const toggleAll = (checked) => setSelected(checked ? books.map((b) => b.bookId) : []);
 
   const handleDeleteBooks = async () => {
+    const toastId = toast.loading("Đang xóa sách...");
     try {
       await axios.delete(`${process.env.NEXT_PUBLIC_API_URL}/api/cart/${user.id}/remove/books`, {
         data: selected,
       });
       fetchCart();
-      alert("Xóa sách thành công!");
+      fetchCartCount();
+      toast.success(`Đã xóa ${selected.length} sách khỏi giỏ.`, { id: toastId });
       setSelected([]);
     } catch (error) {
       console.error(error);
-      alert("Đã có lỗi khi xóa sách!");
+      toast.error("Đã có lỗi khi xóa sách!", { id: toastId });
     }
   };
 
   const handleBorrowBooks = async () => {
+    const toastId = toast.loading("Đang tạo phiếu mượn...");
     try {
       const booksInCart = selected;
       const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/borrow-cards`, {
@@ -90,15 +98,21 @@ useEffect(() => {
       });
 
       if (response.status === 200) {
-        alert("Phiếu mượn đã được tạo!");
+        toast.success("Phiếu mượn đã được tạo!", { id: toastId });
         await axios.delete(`${process.env.NEXT_PUBLIC_API_URL}/api/cart/${user.id}/remove/books`, {
           data: booksInCart,
         });
+        fetchCartCount();
         window.location.href = "/borrowed-card";
-      } else alert("Không thể tạo phiếu mượn");
+      } else toast.error("Không thể tạo phiếu mượn", { id: toastId });
     } catch (error) {
-      console.error(error);
-      alert("Bạn đã vượt quá số lượng sách mượn tối đa hoặc có lỗi xảy ra.");
+      console.error("Lỗi khi tạo phiếu mượn:", error);
+      // Áp dụng logic bắt lỗi thông minh
+      let errorMessage = "Có lỗi xảy ra, vui lòng thử lại.";
+      if (error.response && error.response.data && error.response.data.message) {
+        errorMessage = error.response.data.message;
+      }
+      toast.error(errorMessage, { id: toastId });
     }
   };
 

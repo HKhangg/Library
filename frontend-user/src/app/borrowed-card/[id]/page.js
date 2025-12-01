@@ -4,9 +4,10 @@ import LeftSideBar from "@/app/components/LeftSideBar";
 import ChatBotButton from "../../components/ChatBoxButton";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import axios from "axios";
 import { ThreeDot } from "react-loading-indicators";
+import { Trash2, AlertTriangle } from "lucide-react";
 
 const BookCard = ({
   imageSrc,
@@ -126,16 +127,21 @@ const ChiTietPhieuMuon = () => {
   }, [id]);
 
   const handleDelete = async (info) => {
+    if (!info || !info.id) {
+      toast.error("Lỗi: Không tìm thấy thông tin phiếu mượn.");
+      return;
+    }
+
+    const toastId = toast.loading("Đang xóa phiếu mượn...");
     try {
       await axios.delete(
-        `http://localhost:8081/borrow-card/${info.borrowCardId}`
+        `${process.env.NEXT_PUBLIC_API_URL}/api/borrow-cards/${info.id}`
       );
-      toast.success("Xóa phiếu thành công");
+      toast.success("Xóa phiếu thành công", { id: toastId });
       setPopUpOpen(false);
-
       router.push("/borrowed-card");
     } catch (err) {
-      toast.error("Xóa phiếu thất bại");
+      toast.error("Xóa phiếu thất bại", { id: toastId });
     }
   };
 
@@ -177,12 +183,12 @@ const ChiTietPhieuMuon = () => {
               className="flex self-end text-[1rem] cursor-pointer bg-red-500 hover:bg-red-700 text-white w-fit mb-2"
               onClick={() => setPopUpOpen(true)}
             >
-              <img src="/icon/trash.svg" alt="Delete" className="mr-2" />
+              <Trash2 className="mr-2 h-4 w-4" />
               Xóa
             </Button>
             <BorrowingInfo info={borrowDetail} />
 
-            <h2 className="text-lg font-medium text-[#062D76] text-center mt-5 ">
+            <h2 className="text-lg font-medium text-[#062D76] dark:text-white text-center mt-5 ">
               Danh sách sách mượn
             </h2>
             <section className="grid grid-cols-1 max-sm:grid-cols-1 gap-5 items-start mt-2 w-full max-md:max-w-full">
@@ -205,12 +211,8 @@ const ChiTietPhieuMuon = () => {
           <div className="fixed inset-0 items-center justify-center z-100 flex">
             <div className="w-full h-full bg-black opacity-[80%] absolute top-0 left-0"></div>
             <div className="flex flex-col justify-center self-center bg-white p-6 rounded-lg shadow-lg w-auto fixed">
-              <img
-                src="/icon/canh_bao.svg"
-                alt="Delete"
-                className="mb-2 w-8 h-8 self-center"
-              />
-              <p className="flex justify-center">
+              <AlertTriangle className="mb-2 w-8 h-8 self-center text-red-500" />
+              <p className="flex justify-center dark:text-[#062D76]">
                 Bạn có chắc chắn muốn xóa phiếu này không?
               </p>
 

@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect, useRef } from "react";
-import { Send, MessageCircleMore, Minus, Maximize, Minimize } from "lucide-react";
+import { createPortal } from "react-dom";
+import { Send, MessageCircleMore, Minus, Maximize, Minimize, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import axios from "axios";
 
@@ -87,6 +88,13 @@ const ChatBotButton = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
+  // State đảm bảo portal chỉ chạy ở client side
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   useEffect(() => {
     scrollToBottom();
   }, [messages, isLoading]);
@@ -104,7 +112,25 @@ const ChatBotButton = () => {
       });
     }
   }, [messages]);
+  // ===== THÊM MỚI: Xử lý sự kiện nhấn phím Esc khi fullscreen =====
+  useEffect(() => {
+    // Hàm xử lý sự kiện nhấn phím
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setIsFullScreen(false); // Thu nhỏ cửa sổ
+      }
+    };
 
+    // Chỉ thêm trình nghe sự kiện khi chatbot đang ở chế độ fullscreen
+    if (isFullScreen) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
+
+    // Hàm dọn dẹp: Gỡ bỏ trình nghe sự kiện khi component bị hủy hoặc khi không còn fullscreen
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isFullScreen]); // Hook này chỉ chạy lại khi giá trị của isFullScreen thay đổi
   const sendMessage = async () => {
     if (input.trim() === "" || isLoading) return;
     const userMessageText = input.trim();
@@ -128,15 +154,15 @@ const ChatBotButton = () => {
       const token = localStorage.getItem("accessToken");
 
       if (!userId || !token) {
-           console.error("Lỗi: Không tìm thấy userId hoặc token trong localStorage.");
-           const authError = {
-                sender: "BOT",
-                text: "Lỗi xác thực. Vui lòng đăng nhập lại.",
-                time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-           };
-           setMessages((prev) => [...prev, authError]);
-           setIsLoading(false);
-           return;
+        console.error("Lỗi: Không tìm thấy userId hoặc token trong localStorage.");
+        const authError = {
+          sender: "BOT",
+          text: "Lỗi xác thực. Vui lòng đăng nhập lại.",
+          time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        };
+        setMessages((prev) => [...prev, authError]);
+        setIsLoading(false);
+        return;
       }
 
       const API_URL = "http://localhost:8080/api/chat/message";
@@ -170,9 +196,9 @@ const ChatBotButton = () => {
       console.error("Lỗi khi gọi Backend:", error);
       let errorText = "Xin lỗi, có lỗi kết nối đến máy chủ.";
       if (error.response && error.response.status === 401) {
-          errorText = "Phiên đăng nhập hết hạn hoặc không hợp lệ. Vui lòng đăng nhập lại.";
+        errorText = "Phiên đăng nhập hết hạn hoặc không hợp lệ. Vui lòng đăng nhập lại.";
       } else if (error.response && error.response.data && error.response.data.reply) {
-          errorText = error.response.data.reply;
+        errorText = error.response.data.reply;
       }
 
       const errorMessage = {
@@ -189,8 +215,9 @@ const ChatBotButton = () => {
     }
   };
 
-  return (
-    <div className="fixed bottom-4 right-4 flex flex-col items-end z-[9999]">
+  // Tách toàn bộ giao diện của chatbot ra một biến
+  const chatUI = (
+    <div className="fixed bottom-4 right-4 flex flex-col items-end z-[99999]">
       <Button
         onClick={() => setIsOpen(!isOpen)}
         className="w-12 h-12 p-0 bg-blue-500 rounded-full flex items-center justify-center hover:opacity-80 hover:bg-blue-600 relative"
@@ -201,27 +228,23 @@ const ChatBotButton = () => {
 
       {isOpen && (
         <div
-          className={`${
-            isFullScreen
-              ? "fixed inset-0 w-full h-full"
-              : "fixed bottom-20 right-4 w-80 h-96"
-          } bg-white rounded-xl flex flex-col border-2 border-blue-300 shadow-xl`}
+          className={`${isFullScreen
+            ? "fixed inset-0 w-full h-full"
+            : "fixed bottom-20 right-4 w-80 h-96"
+            } bg-white rounded-xl flex flex-col border-2 border-blue-300 shadow-xl`}
         >
           {/* Header */}
           <div className="flex justify-between items-center p-3 border-b rounded-tl-xl rounded-tr-xl bg-[#E6EAF1] dark:bg-[#1A202C]">
-            {/* THAY ĐỔI: Thêm màu chữ cho dark mode */}
             <span className="text-lg font-semibold text-gray-700 dark:text-gray-200">
               Trợ lý Thư viện
             </span>
             <div className="flex gap-2">
-              {/* THAY ĐỔI: Thêm màu icon cho dark mode */}
               <button
                 onClick={() => setIsOpen(false)}
                 className="text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white"
               >
                 <Minus className="w-5 h-5" />
               </button>
-              {/* THAY ĐỔI: Thêm màu icon cho dark mode */}
               <button
                 onClick={() => setIsFullScreen(!isFullScreen)}
                 className="text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white"
@@ -234,7 +257,6 @@ const ChatBotButton = () => {
               </button>
             </div>
           </div>
-          {/* THAY ĐỔI: Thêm class cho light theme và dark theme để đồng bộ với trang */}
           {/* Nội dung chat */}
           <div
             ref={listRef}
@@ -246,7 +268,6 @@ const ChatBotButton = () => {
                 className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"}`}
               >
                 <div className="flex flex-col max-w-[85%]">
-                  {/* Header: tên + thời gian */}
                   <span
                     className={`text-xs text-gray-500 dark:text-gray-400 mb-1 ${msg.sender === "user" ? "text-right" : "text-left"
                       }`}
@@ -254,15 +275,13 @@ const ChatBotButton = () => {
                     {msg.sender === "user" ? "Bạn" : "Thư viện"}
                     <span className="ml-2 opacity-75">{msg.time}</span>
                   </span>
-
-                  {/* Bubble tin nhắn */}
                   <div
                     className={`px-4 py-2 rounded-lg break-words ${msg.sender === "user"
-                        ? "bg-blue-500 text-white rounded-br-none"
-                        : "bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-tl-none"
+                      ? "bg-blue-500 text-white rounded-br-none"
+                      : "bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-tl-none"
                       }`}
                   >
-                    {msg.text /* hoặc msg.message nếu project của bạn dùng tên này */}
+                    {msg.text}
                   </div>
                 </div>
               </div>
@@ -270,19 +289,11 @@ const ChatBotButton = () => {
 
             {isLoading && (
               <div className="flex justify-start">
-                <div className="flex flex-col">
-                  <span className="text-xs text-gray-500 mb-1">Hehe</span>
-                  <div className="px-4 py-2 rounded-lg bg-white text-gray-700 flex items-center gap-2 rounded-tl-none">
-                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-pulse"></div>
-                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-pulse delay-150"></div>
-                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-pulse delay-300"></div>
-                  </div>
-                </div>
+                {/* ... loading indicator ... */}
               </div>
             )}
             <div ref={messagesEndRef} />
           </div>
-          {/* Ô nhập tin nhắn */}
           {/* Ô nhập tin nhắn */}
           <div className="flex p-2 border-0 bg-white dark:bg-[#1A202C] items-center rounded-br-xl rounded-bl-xl">
             <input
@@ -293,7 +304,6 @@ const ChatBotButton = () => {
               placeholder="Nhập câu hỏi của bạn..."
               className="w-full border-0 rounded-xl px-3 py-2 outline-none bg-transparent text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400"
             />
-
             <Button
               onClick={sendMessage}
               disabled={isLoading || !input.trim()}
@@ -306,11 +316,16 @@ const ChatBotButton = () => {
               )}
             </Button>
           </div>
-
         </div>
       )}
     </div>
   );
+
+  if (isMounted) {
+    return createPortal(chatUI, document.getElementById('chatbot-portal'));
+  }
+  
+  return null;
 };
 
 export default ChatBotButton;

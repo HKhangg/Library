@@ -22,15 +22,26 @@ const Page = () => {
         const response = await axios.post(
           `${process.env.NEXT_PUBLIC_API_URL}/api/borrow-cards/user/${user.id}` // lấy thông tin phiếu mượn của người dùng
         );
-        setAllBorrowCards(response.data);
+        // Gán state nếu response.data là một mảng
+        if (Array.isArray(response.data)) {
+          setAllBorrowCards(response.data);
+        } else {
+          // Nếu API trả về null, undefined, hoặc không phải mảng,
+          // hãy gán state bằng một mảng rỗng
+          setAllBorrowCards([]);
+        }
+
         console.log(response.data);
       } catch (error) {
         console.error("Lỗi khi fetch phiếu mượn:", error);
+
+        // ✅ SỬA LỖI: Luôn gán mảng rỗng nếu có lỗi
+        setAllBorrowCards([]);
       }
     };
 
     fetchBorrowCards();
-  }, []);
+  }, []); 
 
   const filteredCards = allBorrowCards.filter((card) => {
     if (selectedButton === "Đã yêu cầu") return card.status === "Đã yêu cầu";
@@ -59,7 +70,7 @@ const Page = () => {
         <LeftSideBar />
         <section className="self-stretch pr-[1.25rem] md:pl-60 ml-[1.25rem] my-auto w-full max-md:max-w-full mt-2 mb-2">
           <div className="mx-auto">
-            <header className="flex justify-between gap-8 max-lg:gap-3 max-sm:flex-col bg-white p-3 rounded-xl">
+            <header className="flex justify-between gap-8 max-lg:gap-3 max-sm:flex-col bg-white dark:bg-gray-700 p-3 rounded-xl transition-colors duration-300">
               {/* Current Borrowings Status */}
               <Button
                 className={`flex flex-1 gap-2 justify-center items-center text-[1.125rem] max-md:text-[1rem] rounded-md py-5 max-md:py-2 cursor-pointer ${
@@ -137,33 +148,33 @@ const Page = () => {
               {filteredCards.map((borrowing) => (
                 <article
                   key={borrowing.id}
-                  className="p-4 bg-white rounded-xl shadow-sm mb-2"
+                  className="p-4 bg-white dark:bg-gray-600 rounded-xl shadow-sm mb-2 transition-colors duration-300"
                 >
                   <div className="flex justify-between items-center max-md:flex-col max-md:gap-5 max-md:items-start">
                     <div className="flex flex-col gap-2">
-                      <h3 className="text-[1rem] font-semibold text-[#131313]/50">
+                      <h3 className="text-[1rem] font-semibold text-[#131313]/50 dark:text-gray-400">
                         ID:{" "}
-                        <span className="text-[#131313] font-medium">
+                        <span className="text-[#131313] dark:text-gray-100 font-medium">
                           {borrowing.id}
                         </span>
                       </h3>
-                      <p className="text-[1rem] font-semibold text-[#131313]/50">
+                      <p className="text-[1rem] font-semibold text-[#131313]/50 dark:text-gray-400">
                         User ID:{" "}
-                        <span className="text-[#131313] font-medium ">
+                        <span className="text-[#131313] dark:text-gray-100 font-medium ">
                           {borrowing.userId}
                         </span>
                       </p>
-                      <p className="text-[1rem] font-semibold text-[#131313]/50">
+                      <p className="text-[1rem] font-semibold text-[#131313]/50 dark:text-gray-400">
                         Ngày mượn:{" "}
-                        <span className="text-[#131313] font-medium ">
+                        <span className="text-[#131313] dark:text-gray-100 font-medium ">
                           {formatDate(borrowing.borrowDate)}
                         </span>
                       </p>
-                      <p className="text-[1rem] font-semibold text-[#131313]/50">
+                      <p className="text-[1rem] font-semibold text-[#131313]/50 dark:text-gray-400">
                         {selectedButton === "Đang mượn" && (
                           <>
                             Ngày trả dự kiến:{" "}
-                            <span className="text-[#131313] font-medium">
+                            <span className="text-[#131313] dark:text-gray-100 font-medium">
                               {formatDate(borrowing.dueDate)}
                             </span>
                           </>
@@ -172,7 +183,7 @@ const Page = () => {
                         {selectedButton === "Hết hạn" && (
                           <>
                             Ngày trả:{" "}
-                            <span className="text-[#131313] font-medium">
+                            <span className="text-[#131313] dark:text-gray-100 font-medium">
                               {formatDate(borrowing.dueDate)}
                             </span>
                           </>
@@ -181,7 +192,7 @@ const Page = () => {
                         {selectedButton === "Đã yêu cầu" && (
                           <>
                             Hạn lấy sách:{" "}
-                            <span className="text-[#131313] font-medium">
+                            <span className="text-[#131313] dark:text-gray-100 font-medium">
                               {formatDate(borrowing.getBookDate)}
                             </span>
                           </>
