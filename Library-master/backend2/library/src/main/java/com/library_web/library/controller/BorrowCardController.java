@@ -50,6 +50,7 @@ public class BorrowCardController {
     return ResponseEntity.ok(service.getAll());
   }
 
+  // Hiện thị chi tiết phiếu mượn
   @GetMapping("/{id}")
   public ResponseEntity<BorrowCardDTO> getBorrowCardDetails(@PathVariable Long id) {
     BorrowCardDTO details = service.getBorrowCardDetails(id);
@@ -102,7 +103,7 @@ public class BorrowCardController {
     return ResponseEntity.ok(borrowCards); // Trả về danh sách phiếu mượn của người dùng
   }
 
-  // Cập nhật phiếu mượn khi người dùng đến lấy sách
+  // Cập nhật phiếu mượn khi quét barcode mượn sách
   @PutMapping("/borrow/{id}")
   public ResponseEntity<BorrowCard> borrowBooks(@PathVariable Long id, @RequestBody List<String> barcodes) {
     BorrowCard borrowCard = service.updateBorrowCardToBorrowing(id, barcodes);

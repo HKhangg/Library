@@ -102,6 +102,7 @@ public class BorrowCardService {
                                 bookInfos.size());
         }
 
+        // Tạo phiếu mượn
         public BorrowCard create(Long userId, List<Long> bookIds) {
                 System.out.println("dữ liệu: " + bookIds);
 
