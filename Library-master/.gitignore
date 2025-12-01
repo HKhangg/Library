@@ -1,0 +1,45 @@
+# Node modules
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build outputs
+dist/
+build/
+out/
+
+# Environment files
+.env
+*.env
+
+# IntelliJ IDEA / Eclipse / VSCode
+.idea/
+*.iml
+.vscode/
+.settings/
+
+# Java / Maven
+target/
+mvnw.cmd
+mvnw
+.mvn/
+
+# Logs
+logs/
+*.log
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Spring Boot runtime
+*.jar
+*.war
+
+# Backup
+*.bak
+
+# Temporary
+tmp/
+temp/
