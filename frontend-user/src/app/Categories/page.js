@@ -1,23 +1,16 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import axios from "axios";
+import React, { useState, useMemo } from "react";
+import useSWR from "swr";
 import BookCard from "../components/BookCard";
 import { ThreeDot } from "react-loading-indicators";
-import CategorySidebar from "../components/CategorySidebar"; // import mới nếu bạn dùng component
-
-const api = axios.create({
-  baseURL: `${process.env.NEXT_PUBLIC_API_URL}/api/book`,
-});
+import CategorySidebar from "../components/CategorySidebar";
+import { fetcher } from "@/lib/fetcher";
 
 export default function CategoriesPage() {
-  const [categories, setCategories] = useState([]);
-  const [childrenMap, setChildrenMap] = useState({});
   const [activeParentId, setActiveParentId] = useState(null);
   const [activeChildId, setActiveChildId] = useState(null);
   const [activeFilter, setActiveFilter] = useState("ALL");
-  const [books, setBooks] = useState([]);
-  const [loadingBooks, setLoadingBooks] = useState(false);
 
   const filterLabels = {
     ALL: "Tất cả sách",
@@ -25,60 +18,57 @@ export default function CategoriesPage() {
     MOST_BORROWED: "Được mượn nhiều",
   };
 
-  
-  useEffect(() => {
-    axios
-      .get(`${process.env.NEXT_PUBLIC_API_URL}/api/category`)
-      .then((res) => setCategories(res.data || []))
-      .catch((err) => console.error("Lỗi fetch categories:", err));
-  }, []);
-
-
-  useEffect(() => {
-    if (activeParentId === null) {
-      setActiveChildId(null);
-      setActiveFilter("ALL");
-      return;
+  // SWR: Fetch categories (cache lâu vì ít thay đổi)
+  const { data: categories = [], isLoading: categoriesLoading } = useSWR(
+    `${process.env.NEXT_PUBLIC_API_URL}/api/category`,
+    fetcher,
+    {
+      dedupingInterval: 60000,
     }
+  );
 
-    setActiveChildId(null);
-    setActiveFilter("ALL");
+  // SWR: Fetch category children (chỉ fetch khi có activeParentId)
+  const { data: categoryChildren = [], isLoading: childrenLoading } = useSWR(
+    activeParentId
+      ? `${process.env.NEXT_PUBLIC_API_URL}/api/category-child/category/${activeParentId}` 
+      : null,
+    fetcher,
+    {
+      dedupingInterval: 60000,
+    }
+  );
 
-    axios
-      .get(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/category-child/category/${activeParentId}`
-      )
-      .then((res) =>
-        setChildrenMap((prev) => ({
-          ...prev,
-          [activeParentId]: res.data || [],
-        }))
-      )
-      .catch((err) => console.error("Lỗi fetch category-child:", err));
-  }, [activeParentId]);
+  // Build childrenMap
+  const childrenMap = useMemo(() => {
+    if (!activeParentId || !categoryChildren) return {};
+    return { [activeParentId]: categoryChildren };
+  }, [activeParentId, categoryChildren]);
+
+  // Build dynamic book fetch URL
+  const booksUrl = useMemo(() => {
+    const baseUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/book`;
+    if (activeChildId) {
 
 
-  useEffect(() => {
-    setLoadingBooks(true);
-
-    const fetchBooks = async (url) => {
-      try {
-        const res = await api.get(url);
-        setBooks(res.data || []);
-      } catch (err) {
-        console.error("Lỗi fetch books:", err);
-        setBooks([]);
-      } finally {
-        setLoadingBooks(false);
-      }
-    };
-
-    if (activeChildId)
-      fetchBooks(`/v2/category-child/${activeChildId}?filter=${activeFilter}`);
-    else if (activeParentId)
-      fetchBooks(`/v2/category-parent/${activeParentId}?filter=${activeFilter}`);
-    else fetchBooks(`/v2?filter=${activeFilter}`);
+      
+      return `${baseUrl}/v2/category-child/${activeChildId}?filter=${activeFilter}`;
+    } else if (activeParentId) {
+      return `${baseUrl}/v2/category-parent/${activeParentId}?filter=${activeFilter}`;
+    } else {
+      return `${baseUrl}/v2?filter=${activeFilter}`;
+    }
   }, [activeParentId, activeChildId, activeFilter]);
+
+  // ✅ SWR: Fetch books (URL thay đổi khi filter/category thay đổi)
+  const { data: books = [], isLoading: booksLoading } = useSWR(
+    booksUrl,
+    fetcher,
+    {
+      dedupingInterval: 30000,          // Cache 30s - ngăn duplicate request
+      keepPreviousData: true,           // Giữ data cũ khi đổi filter (tránh flash trắng)
+      revalidateOnFocus: false,         // Không refetch khi focus window
+    }
+  );
 
   const currentChildList = activeParentId ? childrenMap[activeParentId] || [] : [];
 
@@ -148,7 +138,7 @@ export default function CategoriesPage() {
             </h2>
 
             {/* Nội dung sách */}
-            {loadingBooks ? (
+            {booksLoading ? (
               <div className="flex justify-center items-center h-[300px]">
                 <ThreeDot
                   color="#30c9e8"

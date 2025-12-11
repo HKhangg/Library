@@ -8,42 +8,48 @@ import { LuTimerOff, LuBookCheck } from "react-icons/lu";
 import { FiLoader } from "react-icons/fi";
 import { Button } from "@/components/ui/button";
 import axios from "axios";
+import { ThreeDot } from "react-loading-indicators";
+import useSWR from "swr";
 
 const Page = () => {
-  const [allBorrowCards, setAllBorrowCards] = useState([]);
-
   const [selectedButton, setSelectedButton] = useState("Đã yêu cầu");
+  const [user, setUser] = useState(null);
+  const route = useRouter();
 
+  // Lấy user từ localStorage
   useEffect(() => {
-    const fetchBorrowCards = async () => {
-      try {
-        const user = JSON.parse(localStorage.getItem("persist:root")); // lấy thông tin người dùng từ localStorage
+    const storedUser = JSON.parse(localStorage.getItem("persist:root"));
+    setUser(storedUser);
+  }, []);
 
-        const response = await axios.post(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/borrow-cards/user/${user.id}` // lấy thông tin phiếu mượn của người dùng
-        );
-        // Gán state nếu response.data là một mảng
-        if (Array.isArray(response.data)) {
-          setAllBorrowCards(response.data);
-        } else {
-          // Nếu API trả về null, undefined, hoặc không phải mảng,
-          // hãy gán state bằng một mảng rỗng
-          setAllBorrowCards([]);
-        }
+  // 2. Fetcher riêng cho API POST này
+  const postFetcher = (url) => axios.post(url).then((res) => res.data);
 
-        console.log(response.data);
-      } catch (error) {
-        console.error("Lỗi khi fetch phiếu mượn:", error);
+  // 3. Sử dụng useSWR
+  // Key là null nếu chưa có user.id (để ngăn fetch sớm)
+  const {
+    data: allBorrowCards = [],
+    isLoading,
+    error,
+  } = useSWR(
+    user?.id
+      ? `${process.env.NEXT_PUBLIC_API_URL}/api/borrow-cards/user/${user.id}`
+      : null,
+    postFetcher,
+    {
+      revalidateOnFocus: true, // Tự động cập nhật khi quay lại tab này
+      fallbackData: [], // Dữ liệu mặc định là mảng rỗng
+      // Xử lý nếu API trả về null thay vì mảng
+      onSuccess: (data) => {
+        if (!Array.isArray(data)) return [];
+      },
+    }
+  );
 
-        // ✅ SỬA LỖI: Luôn gán mảng rỗng nếu có lỗi
-        setAllBorrowCards([]);
-      }
-    };
+  
+  const safeBorrowCards = Array.isArray(allBorrowCards) ? allBorrowCards : [];
 
-    fetchBorrowCards();
-  }, []); 
-
-  const filteredCards = allBorrowCards.filter((card) => {
+  const filteredCards = safeBorrowCards.filter((card) => {
     if (selectedButton === "Đã yêu cầu") return card.status === "Đã yêu cầu";
     if (selectedButton === "Đang mượn") return card.status === "Đang mượn";
     if (selectedButton === "Hết hạn") return card.status === "Hết hạn";
@@ -51,15 +57,15 @@ const Page = () => {
   });
 
   const formatDate = (dateString) => {
+    if (!dateString) return "N/A";
     const date = new Date(dateString);
-    return date.toLocaleDateString("vi-VN"); // Kết quả: 22/04/2025
+    return date.toLocaleDateString("vi-VN");
   };
 
   const handleButtonClick = (buttonType) => {
     setSelectedButton(buttonType);
   };
 
-  const route = useRouter();
   const handleDetails = (id) => {
     route.push(`/borrowed-card/${id}`);
   };
@@ -73,153 +79,129 @@ const Page = () => {
             <header className="flex justify-between gap-8 max-lg:gap-3 max-sm:flex-col bg-white dark:bg-gray-700 p-3 rounded-xl transition-colors duration-300">
               {/* Current Borrowings Status */}
               <Button
-                className={`flex flex-1 gap-2 justify-center items-center text-[1.125rem] max-md:text-[1rem] rounded-md py-5 max-md:py-2 cursor-pointer ${
-                  selectedButton === "Đã yêu cầu"
+                className={`flex flex-1 gap-2 justify-center items-center text-[1.125rem] max-md:text-[1rem] rounded-md py-5 max-md:py-2 cursor-pointer ${selectedButton === "Đã yêu cầu"
                     ? "bg-[#062D76] text-white hover:bg-[#062D76] hover:text-white"
                     : "bg-gray-300 text-[#131313] hover:bg-[#062D76] hover:text-white"
-                }`}
+                  }`}
                 onClick={() => handleButtonClick("Đã yêu cầu")}
               >
-                <FiLoader
-                  style={{
-                    width: "1.25rem",
-                    height: "1.25rem",
-                  }}
-                  className="size-6"
-                />
+                <FiLoader className="size-6 w-5 h-5" />
                 Đã yêu cầu
               </Button>
 
               <Button
-                className={`flex flex-1 gap-2 justify-center items-center text-[1.125rem] max-md:text-[1rem] font-medium rounded-md py-5 max-md:py-2 cursor-pointer ${
-                  selectedButton === "Đang mượn"
+                className={`flex flex-1 gap-2 justify-center items-center text-[1.125rem] max-md:text-[1rem] font-medium rounded-md py-5 max-md:py-2 cursor-pointer ${selectedButton === "Đang mượn"
                     ? "bg-[#062D76] text-white hover:bg-[#062D76] hover:text-white"
                     : "bg-gray-300 text-[#131313] hover:bg-[#062D76] hover:text-white"
-                }`}
+                  }`}
                 onClick={() => handleButtonClick("Đang mượn")}
               >
-                <LuBookCheck
-                  style={{
-                    width: "1.25rem",
-                    height: "1.25rem",
-                  }}
-                  className="size-6"
-                />
+                <LuBookCheck className="size-6 w-5 h-5" />
                 Đang mượn
               </Button>
 
               {/* Returned Status */}
               <Button
-                className={`flex flex-1 gap-3 justify-center items-center text-[1.125rem] max-md:text-[1rem] font-medium rounded-md py-5 max-md:py-2 cursor-pointer ${
-                  selectedButton === "Hết hạn"
+                className={`flex flex-1 gap-3 justify-center items-center text-[1.125rem] max-md:text-[1rem] font-medium rounded-md py-5 max-md:py-2 cursor-pointer ${selectedButton === "Hết hạn"
                     ? "bg-[#062D76] text-white hover:bg-[#062D76] hover:text-white"
                     : "bg-gray-300 text-[#131313] hover:bg-[#062D76] hover:text-white"
-                }`}
+                  }`}
                 onClick={() => handleButtonClick("Hết hạn")}
               >
-                <LuTimerOff
-                  style={{
-                    width: "1.25rem",
-                    height: "1.25rem",
-                  }}
-                  className="size-6"
-                />
+                <LuTimerOff className="size-6 w-5 h-5" />
                 Hết hạn
               </Button>
             </header>
 
-            {/* Search Section */}
-            {/* <div className="flex flex-wrap gap-3 items-center px-3 py-2.5 mt-3 w-full text-[1.125rem] leading-none text-[#062D76] bg-white backdrop-blur-[100px] min-h-[50px] rounded-[100px] max-md:max-w-full">
-              <img
-                src="https://cdn.builder.io/api/v1/image/assets/TEMP/669888cc237b300e928dbfd847b76e4236ef4b5a?placeholderIfAbsent=true&apiKey=d911d70ad43c41e78d81b9650623c816"
-                alt="Search icon"
-                className="object-contain shrink-0 self-stretch my-auto aspect-square w-[30px] cursor-pointer"
-              />
-              <input
-                type="search"
-                id="search-input"
-                placeholder="Tìm kiếm"
-                className="flex-1 md:text-[1.125rem] bg-transparent border-none outline-none placeholder-[#062D76] text-[#062D76] focus:ring-2 focus:ring-red-dark focus:ring-opacity-50"
-              />
-            </div> */}
-
-            {/* Borrowing Cards Section */}
-            <section className="gap-y-2.5 mt-5">
-              {filteredCards.map((borrowing) => (
-                <article
-                  key={borrowing.id}
-                  className="p-4 bg-white dark:bg-gray-600 rounded-xl shadow-sm mb-2 transition-colors duration-300"
-                >
-                  <div className="flex justify-between items-center max-md:flex-col max-md:gap-5 max-md:items-start">
-                    <div className="flex flex-col gap-2">
-                      <h3 className="text-[1rem] font-semibold text-[#131313]/50 dark:text-gray-400">
-                        ID:{" "}
-                        <span className="text-[#131313] dark:text-gray-100 font-medium">
-                          {borrowing.id}
-                        </span>
-                      </h3>
-                      <p className="text-[1rem] font-semibold text-[#131313]/50 dark:text-gray-400">
-                        User ID:{" "}
-                        <span className="text-[#131313] dark:text-gray-100 font-medium ">
-                          {borrowing.userId}
-                        </span>
-                      </p>
-                      <p className="text-[1rem] font-semibold text-[#131313]/50 dark:text-gray-400">
-                        Ngày mượn:{" "}
-                        <span className="text-[#131313] dark:text-gray-100 font-medium ">
-                          {formatDate(borrowing.borrowDate)}
-                        </span>
-                      </p>
-                      <p className="text-[1rem] font-semibold text-[#131313]/50 dark:text-gray-400">
-                        {selectedButton === "Đang mượn" && (
-                          <>
-                            Ngày trả dự kiến:{" "}
-                            <span className="text-[#131313] dark:text-gray-100 font-medium">
-                              {formatDate(borrowing.dueDate)}
-                            </span>
-                          </>
-                        )}
-
-                        {selectedButton === "Hết hạn" && (
-                          <>
-                            Ngày trả:{" "}
-                            <span className="text-[#131313] dark:text-gray-100 font-medium">
-                              {formatDate(borrowing.dueDate)}
-                            </span>
-                          </>
-                        )}
-
-                        {selectedButton === "Đã yêu cầu" && (
-                          <>
-                            Hạn lấy sách:{" "}
-                            <span className="text-[#131313] dark:text-gray-100 font-medium">
-                              {formatDate(borrowing.getBookDate)}
-                            </span>
-                          </>
-                        )}
-                      </p>
-                    </div>
-                    <Button
-                      className="flex gap-2 justify-center items-center px-3 py-1 text-[1rem] font-normal self-center bg-[#062D76] text-white hover:bg-[#E6EAF1] hover:text-[#062D76] rounded-3xl cursor-pointer"
-                      aria-label={`View details for borrowing ${borrowing.id}`}
-                      onClick={() => {
-                        handleDetails(borrowing.id);
-                      }}
+            {/* Loading State */}
+            {isLoading ? (
+              <div className="flex justify-center items-center h-[300px]">
+                <ThreeDot
+                  color="#062D76"
+                  size="large"
+                  text="Đang tải dữ liệu..."
+                  variant="bounce"
+                  textColor="#062D76"
+                />
+              </div>
+            ) : (
+              /* Borrowing Cards Section */
+              <section className="gap-y-2.5 mt-5">
+                {filteredCards.length > 0 ? (
+                  filteredCards.map((borrowing) => (
+                    <article
+                      key={borrowing.id}
+                      className="p-4 bg-white dark:bg-gray-600 rounded-xl shadow-sm mb-2 transition-colors duration-300"
                     >
-                      <TbListDetails
-                        style={{
-                          width: "1.5rem",
-                          height: "1.5rem",
-                          strokeWidth: "1px",
-                        }}
-                        className="size-6"
-                      />
-                      Xem chi tiết
-                    </Button>
-                  </div>
-                </article>
-              ))}
-            </section>
+                      <div className="flex justify-between items-center max-md:flex-col max-md:gap-5 max-md:items-start">
+                        <div className="flex flex-col gap-2">
+                          <h3 className="text-[1rem] font-semibold text-[#131313]/50 dark:text-gray-400">
+                            ID:{" "}
+                            <span className="text-[#131313] dark:text-gray-100 font-medium">
+                              {borrowing.id}
+                            </span>
+                          </h3>
+                          <p className="text-[1rem] font-semibold text-[#131313]/50 dark:text-gray-400">
+                            User ID:{" "}
+                            <span className="text-[#131313] dark:text-gray-100 font-medium ">
+                              {borrowing.userId}
+                            </span>
+                          </p>
+                          <p className="text-[1rem] font-semibold text-[#131313]/50 dark:text-gray-400">
+                            Ngày mượn:{" "}
+                            <span className="text-[#131313] dark:text-gray-100 font-medium ">
+                              {formatDate(borrowing.borrowDate)}
+                            </span>
+                          </p>
+                          <p className="text-[1rem] font-semibold text-[#131313]/50 dark:text-gray-400">
+                            {selectedButton === "Đang mượn" && (
+                              <>
+                                Ngày trả dự kiến:{" "}
+                                <span className="text-[#131313] dark:text-gray-100 font-medium">
+                                  {formatDate(borrowing.dueDate)}
+                                </span>
+                              </>
+                            )}
+
+                            {selectedButton === "Hết hạn" && (
+                              <>
+                                Ngày trả:{" "}
+                                <span className="text-[#131313] dark:text-gray-100 font-medium">
+                                  {formatDate(borrowing.dueDate)}
+                                </span>
+                              </>
+                            )}
+
+                            {selectedButton === "Đã yêu cầu" && (
+                              <>
+                                Hạn lấy sách:{" "}
+                                <span className="text-[#131313] dark:text-gray-100 font-medium">
+                                  {formatDate(borrowing.getBookDate)}
+                                </span>
+                              </>
+                            )}
+                          </p>
+                        </div>
+                        <Button
+                          className="flex gap-2 justify-center items-center px-3 py-1 text-[1rem] font-normal self-center bg-[#062D76] text-white hover:bg-[#E6EAF1] hover:text-[#062D76] rounded-3xl cursor-pointer"
+                          aria-label={`View details for borrowing ${borrowing.id}`}
+                          onClick={() => {
+                            handleDetails(borrowing.id);
+                          }}
+                        >
+                          <TbListDetails className="size-6 w-6 h-6 stroke-[1px]" />
+                          Xem chi tiết
+                        </Button>
+                      </div>
+                    </article>
+                  ))
+                ) : (
+                  <p className="text-center text-gray-500 mt-10">
+                    Không có phiếu mượn nào ở trạng thái này.
+                  </p>
+                )}
+              </section>
+            )}
           </div>
         </section>
         <ChatBotButton />

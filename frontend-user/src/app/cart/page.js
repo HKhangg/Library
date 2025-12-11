@@ -4,112 +4,145 @@ import LeftSideBar from "../components/LeftSideBar";
 import BookCard from "./book";
 import axios from "axios";
 import { ThreeDot } from "react-loading-indicators";
-
 import { toast } from "sonner";
 import { useCart } from "@/app/context/CartContext";
+import useSWR, { mutate } from "swr";
+
+// Fetcher dùng chung cho GET request
+const fetcher = (url) => axios.get(url).then((res) => res.data);
 
 const Page = () => {
   const [selected, setSelected] = useState([]);
-  const [maxAllowed, setMaxAllowed] = useState(null);
-  const [books, setBooks] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const user = JSON.parse(localStorage.getItem("persist:root"));
-  
-  let cartId = "";
+  const [user, setUser] = useState(null);
+
+  // Lấy hàm update Header từ Context
   const { fetchCart: fetchCartCount } = useCart();
 
-  const fetchMaxAllowed = async () => {
-    try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/settings`);
-      if (!res.ok) throw new Error("Không thể tải cài đặt.");
-      const result = await res.json();
-      setMaxAllowed(result.maxBorrowedBooks);
-    } catch (error) {
-      console.error("Lỗi khi lấy cài đặt:", error);
-      setMaxAllowed(5);
-    } 
-  };
+  // Lấy user từ localStorage (client-side only)
+  useEffect(() => {
+    const storedUser = JSON.parse(localStorage.getItem("persist:root"));
+    setUser(storedUser);
+  }, []);
 
+  // 2. useSWR: Lấy Cài đặt (Max Borrowed Books)
+  const { data: settingsData } = useSWR(
+    `${process.env.NEXT_PUBLIC_API_URL}/api/settings`,
+    fetcher
+  );
+  const maxAllowed = settingsData?.maxBorrowedBooks || 5;
 
-  const fetchCart = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/cart/${user.id}`);
-      if (response.ok) {
-        const data = await response.json();
-        cartId = data.data.id;
-        setBooks(Array.isArray(data.data) ? data.data : []);
-      }
-      else {
-        console.error("Lỗi khi lấy giỏ hàng");
-        setBooks([]);
-      }
-    } catch (error) {
-      console.error(error);
-      setBooks([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // 3. useSWR: Lấy Giỏ hàng
+  // Key phụ thuộc vào user.id, nếu chưa có user thì không fetch (null)
+  const cartApiUrl = user?.id
+    ? `${process.env.NEXT_PUBLIC_API_URL}/api/cart/${user.id}`
+    : null;
 
-useEffect(() => {
-    if (!user?.id) {
-      setBooks([]);
-      setLoading(false);
-      return;
-    }
-    fetchMaxAllowed();
-    fetchCart();
-  }, [user?.id]);
+  const { data: cartResponse, isLoading } = useSWR(cartApiUrl, fetcher, {
+    revalidateOnFocus: true, // Tự động làm mới khi quay lại tab
+    fallbackData: { data: [] }, // Dữ liệu mặc định
+  });
+
+  // Trích xuất mảng sách từ response (API trả về object có thuộc tính .data)
+  const books = Array.isArray(cartResponse?.data) ? cartResponse.data : [];
 
   const toggleBook = (bookId, checked) => {
-    setSelected((prev) => (checked ? [...prev, bookId] : prev.filter((i) => i !== bookId)));
+    setSelected((prev) =>
+      checked ? [...prev, bookId] : prev.filter((i) => i !== bookId)
+    );
   };
 
-  const allChecked = selected.length === books?.length;
- const toggleAll = (checked) => setSelected(checked ? books.map((b) => b.bookId) : []);
+  const allChecked = books.length > 0 && selected.length === books.length;
 
+  const toggleAll = (checked) =>
+    setSelected(checked ? books.map((b) => b.bookId) : []);
+
+  // Hàm xóa sách khỏi giỏ dùng mutate
   const handleDeleteBooks = async () => {
+    if (selected.length === 0) {
+      toast.warning("Vui lòng chọn sách cần xóa");
+      return;
+    }
+
     const toastId = toast.loading("Đang xóa sách...");
     try {
-      await axios.delete(`${process.env.NEXT_PUBLIC_API_URL}/api/cart/${user.id}/remove/books`, {
-        data: selected,
-      });
-      fetchCart();
+      await axios.delete(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/cart/${user.id}/remove/books`,
+        { data: selected }
+      );
+
+      // A. Cập nhật dữ liệu tại chỗ (Local Mutate) để giao diện nhanh hơn
+      // (Báo cho SWR biết dữ liệu mới là gì mà không cần chờ server trả lời ngay)
+      mutate(cartApiUrl, {
+        ...cartResponse,
+        data: books.filter(b => !selected.includes(b.bookId))
+      }, false);
+
+      // B. Gọi API ngầm để xác thực lại dữ liệu chuẩn
+      mutate(cartApiUrl);
+
+      // C. Cập nhật Header
       fetchCartCount();
+
       toast.success(`Đã xóa ${selected.length} sách khỏi giỏ.`, { id: toastId });
-      setSelected([]);
+      setSelected([]); // Reset lựa chọn
     } catch (error) {
       console.error(error);
       toast.error("Đã có lỗi khi xóa sách!", { id: toastId });
     }
   };
 
+  // Hàm mượn sách từ giỏ dùng mutate
   const handleBorrowBooks = async () => {
+    if (selected.length === 0) {
+      toast.warning("Vui lòng chọn sách để mượn");
+      return;
+    }
+
     const toastId = toast.loading("Đang tạo phiếu mượn...");
     try {
-      const booksInCart = selected;
-      const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/borrow-cards`, {
-        userId: user.id,
-        borrowedBooks: booksInCart.map((bookId) => ({ bookId, childBookId: null })),
+      const booksInCart = selected; // Mảng ID sách
+
+      // Payload chuẩn cho backend
+      const payload = {
+        userId: parseInt(user.id, 10),
+        borrowedBooks: booksInCart.map((bookId) => ({
+          bookId: parseInt(bookId, 10),
+          childBookId: null,
+        })),
         borrowDate: new Date().toISOString(),
         status: "REQUESTED",
         dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-      });
+      };
+
+      const response = await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/borrow-cards`,
+        payload
+      );
 
       if (response.status === 200) {
         toast.success("Phiếu mượn đã được tạo!", { id: toastId });
-        await axios.delete(`${process.env.NEXT_PUBLIC_API_URL}/api/cart/${user.id}/remove/books`, {
-          data: booksInCart,
-        });
+
+        // Xóa sách khỏi giỏ hàng sau khi mượn
+        await axios.delete(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/cart/${user.id}/remove/books`,
+          { data: booksInCart }
+        );
+
+        // A. Cập nhật SWR (Làm mới giỏ hàng)
+        mutate(cartApiUrl);
+
+        // B. Cập nhật Header
         fetchCartCount();
+
+        // C. Chuyển trang
         window.location.href = "/borrowed-card";
-      } else toast.error("Không thể tạo phiếu mượn", { id: toastId });
+      } else {
+        toast.error("Không thể tạo phiếu mượn", { id: toastId });
+      }
     } catch (error) {
       console.error("Lỗi khi tạo phiếu mượn:", error);
-      // Áp dụng logic bắt lỗi thông minh
       let errorMessage = "Có lỗi xảy ra, vui lòng thử lại.";
-      if (error.response && error.response.data && error.response.data.message) {
+      if (error.response?.data?.message) {
         errorMessage = error.response.data.message;
       }
       toast.error(errorMessage, { id: toastId });
@@ -130,7 +163,8 @@ useEffect(() => {
               </h2>
             </div>
 
-              {loading ? (
+            {/* Loading State */}
+            {isLoading ? (
               <div className="flex justify-center items-center h-[300px]">
                 <ThreeDot
                   color="#30c9e8"
@@ -140,18 +174,17 @@ useEffect(() => {
                   textColor="#30c9e8"
                 />
               </div>
-            ) : !loading && books.length === 0 ? (
+            ) : books.length === 0 ? (
               <p className="text-center text-gray-500 dark:text-gray-400 py-10">
                 Giỏ sách trống, hãy thêm sách để mượn nhé 📚
               </p>
             ) : (
-            <div className="grid grid-cols-1 max-sm:grid-cols-1 gap-5 items-start mt-5 w-full max-md:max-w-full z-10">
-              {Array.isArray(books) &&
-                books.map((book, index) => (
+              <div className="grid grid-cols-1 max-sm:grid-cols-1 gap-5 items-start mt-5 w-full max-md:max-w-full z-10">
+                {books.map((book) => (
                   <BookCard
                     key={book.bookId}
                     id={book.bookId}
-                    imageSrc={book.hinhAnh[0]}
+                    imageSrc={book.hinhAnh?.[0]}
                     available={
                       book.tongSoLuong - book.soLuongMuon - book.soLuongXoa > 0
                         ? "Còn sẵn"
@@ -163,20 +196,18 @@ useEffect(() => {
                     borrowCount={book.soLuongMuon}
                     checked={selected.includes(book.bookId)}
                     onCheck={(c) => toggleBook(book.bookId, c)}
-                    hoverEffect={true} 
-     
+                    hoverEffect={true}
                   />
                 ))}
-            </div>
-           )}
+              </div>
+            )}
           </div>
 
           {selected.length > 0 && (
-           <footer className="fixed bottom-0 self-stretch mr-5 md:left-64 ml-5 right-0 
-              bg-blue-50 dark:bg-gray-800/80 backdrop-blur-md shadow-lg 
-              p-4 flex justify-between items-center rounded-t-xl 
-              transition-all duration-300 border-t border-gray-300 dark:border-gray-600 z-20">
-              
+            <footer className="fixed bottom-0 self-stretch mr-5 md:left-64 ml-5 right-0 
+                     bg-blue-50 dark:bg-gray-800/80 backdrop-blur-md shadow-lg 
+                     p-4 flex justify-between items-center rounded-t-xl 
+                     transition-all duration-300 border-t border-gray-300 dark:border-gray-600 z-20">
               {/* Checkbox chọn tất cả */}
               <div className="flex items-center gap-2">
                 <input
@@ -195,9 +226,9 @@ useEffect(() => {
                 <button
                   onClick={handleDeleteBooks}
                   className="px-5 py-2.5 rounded-xl border border-transparent 
-                    bg-gradient-to-r from-[#F7302E] to-[#F44336] 
-                    text-white font-medium shadow-sm hover:brightness-110 
-                    hover:scale-[1.03] active:scale-95 transition-all duration-300"
+                       bg-gradient-to-r from-[#F7302E] to-[#F44336] 
+                       text-white font-medium shadow-sm hover:brightness-110 
+                       hover:scale-[1.03] active:scale-95 transition-all duration-300"
                 >
                   Xóa sách ({selected.length})
                 </button>
@@ -205,9 +236,9 @@ useEffect(() => {
                 <button
                   onClick={handleBorrowBooks}
                   className="px-5 py-2.5 rounded-xl border border-transparent 
-                    bg-gradient-to-r from-[#062D76] to-[#0a3c9d]
-                    text-white font-medium shadow-sm hover:brightness-110 
-                    hover:scale-[1.03] active:scale-95 transition-all duration-300"
+                       bg-gradient-to-r from-[#062D76] to-[#0a3c9d]
+                       text-white font-medium shadow-sm hover:brightness-110 
+                       hover:scale-[1.03] active:scale-95 transition-all duration-300"
                 >
                   Đăng ký mượn ({selected.length})
                 </button>
