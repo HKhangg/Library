@@ -6,9 +6,11 @@ import Sidebar from "@/app/components/sidebar/Sidebar";
 import { Input } from "@/app/components/ui/input";
 import { Button } from "@/app/components/ui/button";
 import { Undo2, Save, PlusCircle, Trash2 } from "lucide-react";
-import toast from "react-hot-toast";
+import toast, { Toaster } from "react-hot-toast";
 import axios from "axios";
 import { ThreeDot } from "react-loading-indicators";
+
+import { mutate } from "swr";
 
 export default function AddCategoryPage() {
   const router = useRouter();
@@ -18,16 +20,13 @@ export default function AddCategoryPage() {
   });
   const [loading, setLoading] = useState(false);
 
+  // Giữ nguyên logic của nút back
   useEffect(() => {
     const handlePopState = () => {
       router.replace("/books/categories");
     };
-
     window.addEventListener("popstate", handlePopState);
-
-    return () => {
-      window.removeEventListener("popstate", handlePopState);
-    };
+    return () => window.removeEventListener("popstate", handlePopState);
   }, [router]);
 
   const handleChange = (e) => {
@@ -68,6 +67,7 @@ export default function AddCategoryPage() {
   };
 
   const handleSave = async () => {
+    // Validation
     if (!categoryData.name.trim()) {
       toast.error("Vui lòng nhập tên danh mục cha!");
       return;
@@ -83,13 +83,26 @@ export default function AddCategoryPage() {
     };
 
     setLoading(true);
+    // 2. Bắt đầu Toast Loading
+    const toastId = toast.loading("Đang tạo danh mục...");
+
     try {
       await axios.post(
         `${process.env.NEXT_PUBLIC_API_URL}/api/category`,
         payload
       );
-      toast.success("Thêm danh mục thành công");
-      router.replace("/books/categories");
+
+      // 3. SWR Mutate: Làm mới cache của trang danh sách danh mục
+      // Để khi redirect về, danh sách sẽ tự động cập nhật
+      mutate(`${process.env.NEXT_PUBLIC_API_URL}/api/category`);
+
+      toast.success("Thêm danh mục thành công", { id: toastId });
+
+      // Chờ xíu cho đẹp rồi chuyển trang
+      setTimeout(() => {
+        router.replace("/books/categories");
+      }, 500);
+
     } catch (error) {
       console.error("Lỗi khi thêm danh mục:", {
         message: error.message,
@@ -98,27 +111,30 @@ export default function AddCategoryPage() {
       });
       const errorMessage =
         error.response?.data?.message || "Thêm danh mục thất bại";
-      toast.error(errorMessage);
-    } finally {
-      setLoading(false);
+      toast.error(errorMessage, { id: toastId });
+      setLoading(false); // Chỉ tắt loading khi lỗi, thành công thì để loading cho đến khi chuyển trang
     }
   };
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-screen">
-        <ThreeDot text="Loading" />
+      <div className="flex w-full h-screen bg-[#EFF3FB]">
+        <Sidebar />
+        <div className="flex-1 flex justify-center items-center">
+          <ThreeDot color="#062D76" size="large" text="Đang xử lý..." />
+        </div>
       </div>
     );
   }
 
   return (
     <div className="flex flex-row w-full min-h-screen bg-[#EFF3FB]">
+      <Toaster position="top-center" reverseOrder={false} />
       <Sidebar />
       <div className="flex flex-col w-full md:ml-52 px-10 pt-10 gap-6">
         <div className="flex gap-3 items-center">
           <Button
-            className="bg-[#062D76] rounded-xl w-10 h-10"
+            className="bg-[#062D76] rounded-xl w-10 h-10 hover:bg-gray-700"
             onClick={() => router.replace("/books/categories")}
             disabled={loading}
           >
@@ -155,7 +171,7 @@ export default function AddCategoryPage() {
                 />
                 <Button
                   onClick={() => handleRemoveChild(index)}
-                  className="bg-red-500 rounded-xl w-10 h-10 flex items-center justify-center"
+                  className="bg-red-500 rounded-xl w-10 h-10 flex items-center justify-center hover:bg-red-600"
                   disabled={loading}
                 >
                   <Trash2 color="white" size={20} />
@@ -174,7 +190,7 @@ export default function AddCategoryPage() {
 
           <div className="mt-6">
             <Button
-              className="bg-[#062D76] rounded-xl px-6 py-2 flex gap-2"
+              className="bg-[#062D76] rounded-xl px-6 py-2 flex gap-2 hover:bg-gray-700"
               onClick={handleSave}
               disabled={loading}
             >

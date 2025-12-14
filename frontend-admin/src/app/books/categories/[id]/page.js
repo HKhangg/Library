@@ -6,192 +6,177 @@ import { Input } from "@/app/components/ui/input";
 import { Button } from "@/app/components/ui/button";
 import Sidebar from "@/app/components/sidebar/Sidebar";
 import { Undo2, Save, PlusCircle, Trash2, Edit2, X } from "lucide-react";
-import toast from "react-hot-toast";
+import toast, { Toaster } from "react-hot-toast";
 import axios from "axios";
 import { ThreeDot } from "react-loading-indicators";
+
+import useSWR, { mutate } from "swr";
+import { fetcher } from "@/lib/fetcher"; 
 
 export default function EditCategoryPage() {
   const router = useRouter();
   const { id } = useParams();
+
+  // State Form Data
   const [data, setData] = useState({
     name: "",
     soLuongDanhMuc: 0,
     children: [],
   });
-  const [loading, setLoading] = useState(true);
+
+  // State UI
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [showAddChildModal, setShowAddChildModal] = useState(false);
   const [newChildName, setNewChildName] = useState("");
-  const didFetch = useRef(false);
 
+  // 2. useSWR: Lấy thông tin chi tiết danh mục
+  const {
+    data: categoryData,
+    isLoading,
+    error,
+    mutate: mutateCategory // Fetch lại dữ liệu khi cần
+  } = useSWR(
+    id ? `${process.env.NEXT_PUBLIC_API_URL}/api/category/${id}` : null,
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      onError: () => {
+        toast.error("Không thể tải danh mục");
+        router.replace("/books/categories");
+      }
+    }
+  );
+
+  // 3. Populate Data: Khi có data từ SWR thì đổ vào form state
+  useEffect(() => {
+    if (categoryData) {
+      setData({
+        name: categoryData.name || "",
+        soLuongDanhMuc: categoryData.children?.length || 0,
+        children: categoryData.children || [],
+      });
+    }
+  }, [categoryData]);
+
+  // Handle browser back button logic (Giữ nguyên từ code cũ của bạn)
   useEffect(() => {
     const handlePopState = () => {
       router.replace("/books/categories");
     };
-
     window.addEventListener("popstate", handlePopState);
-
-    return () => {
-      window.removeEventListener("popstate", handlePopState);
-    };
+    return () => window.removeEventListener("popstate", handlePopState);
   }, [router]);
-
-  useEffect(() => {
-    if (didFetch.current) return;
-    didFetch.current = true;
-    (async () => {
-      try {
-        const res = await axios.get(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/category/${id}`
-        );
-        setData({
-          name: res.data.name,
-          soLuongDanhMuc: res.data.children.length,
-          children: res.data.children,
-        });
-      } catch (err) {
-        console.error("Lỗi khi lấy danh mục:", err);
-        toast.error("Không thể tải danh mục");
-        router.replace("/books/categories");
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [id, router]);
 
   const updateField = (e) => {
     setData({ ...data, [e.target.name]: e.target.value });
   };
 
+  // HÀM THÊM DANH MỤC CON
   const addChild = async () => {
     if (!newChildName.trim()) {
       toast.error("Vui lòng nhập tên danh mục con");
       return;
     }
+
+    const toastId = toast.loading("Đang thêm danh mục con...");
     try {
-      const res = await axios.post(
+      await axios.post(
         `${process.env.NEXT_PUBLIC_API_URL}/api/category-child/category/${id}/add`,
         { name: newChildName }
       );
-      setData((prev) => ({
-        ...prev,
-        soLuongDanhMuc: prev.soLuongDanhMuc + 1,
-        children: [...prev.children, res.data],
-      }));
-      toast.success("Thêm danh mục con thành công");
+
+      // Refresh lại data từ server để đảm bảo đồng bộ
+      await mutateCategory();
+
+      toast.success("Thêm danh mục con thành công", { id: toastId });
       setShowAddChildModal(false);
       setNewChildName("");
     } catch (err) {
       console.error("Lỗi khi thêm danh mục con:", err);
-      toast.error("Thêm danh mục con thất bại do nó đã tồn tại.");
+      toast.error("Thêm danh mục con thất bại (có thể đã tồn tại).", { id: toastId });
     }
   };
 
+  // HÀM CẬP NHẬT TÊN DANH MỤC CHA
   const save = async () => {
     if (!data.name.trim()) {
       toast.error("Vui lòng nhập tên danh mục cha");
       return;
     }
+
+    const toastId = toast.loading("Đang cập nhật...");
     try {
       await axios.patch(
         `${process.env.NEXT_PUBLIC_API_URL}/api/category/${id}`,
-        {
-          name: data.name,
-        }
+        { name: data.name }
       );
-      toast.success("Cập nhật danh mục thành công");
-      router.replace("/books/categories");
+
+      // Update cache SWR (cho cả danh sách bên ngoài nếu cần, nhưng quan trọng là trang này)
+      mutateCategory();
+
+      toast.success("Cập nhật danh mục thành công", { id: toastId });
+      setTimeout(() => router.replace("/books/categories"), 500);
     } catch (err) {
-      console.error("Lỗi khi cập nhật danh mục:", err);
-      toast.error("Cập nhật thất bại");
+      console.error("Lỗi khi cập nhật:", err);
+      toast.error("Cập nhật thất bại", { id: toastId });
     }
   };
 
+  // HÀM XÓA DANH MỤC CHA
   const deleteParent = async () => {
+    const toastId = toast.loading("Đang xóa danh mục...");
     try {
       await axios.delete(
         `${process.env.NEXT_PUBLIC_API_URL}/api/category/${id}`
       );
-      toast.success("Xóa toàn bộ danh mục thành công");
+      toast.success("Xóa toàn bộ danh mục thành công", { id: toastId });
       router.replace("/books/categories");
     } catch (err) {
-      console.error("Lỗi khi xóa danh mục cha:", {
-        message: err.message,
-        status: err.response?.status,
-        data: err.response?.data,
-        fullError: err.toString(),
-      });
+      // Logic xử lý lỗi chi tiết giữ nguyên để thông báo chính xác cho user
       let errorMessage = "Xóa danh mục cha thất bại";
       if (err.response?.data) {
-        const errorData = err.response.data;
-        const errorString = JSON.stringify(errorData).toLowerCase();
+        const errorString = JSON.stringify(err.response.data).toLowerCase();
         if (
           errorString.includes("foreign key constraint") ||
           errorString.includes("referenced from table")
         ) {
           errorMessage = "Không thể xóa vì có sách liên quan đến danh mục con";
         } else if (err.response.status === 400) {
-          errorMessage =
-            errorData.message || "Không thể xóa do có dữ liệu liên quan";
-        } else if (err.response.status === 404) {
-          errorMessage = "Danh mục cha không tồn tại";
-        } else if (errorData.message) {
-          errorMessage = errorData.message;
+          errorMessage = err.response.data.message || "Không thể xóa do có dữ liệu liên quan";
         }
-      } else if (err.request) {
-        errorMessage = "Không thể kết nối đến server rồi.";
-      } else {
-        errorMessage = "Lỗi không xác định: " + err.message;
       }
-      toast.error(errorMessage);
+      toast.error(errorMessage, { id: toastId });
     } finally {
       setShowDeleteModal(false);
       setDeleteTarget(null);
     }
   };
 
+  // HÀM XÓA DANH MỤC CON
   const deleteChild = async (childId) => {
+    const toastId = toast.loading("Đang xóa danh mục con...");
     try {
       await axios.delete(
         `${process.env.NEXT_PUBLIC_API_URL}/api/category-child/${childId}`
       );
-      setData((prev) => ({
-        ...prev,
-        soLuongDanhMuc: prev.soLuongDanhMuc - 1,
-        children: prev.children.filter((x) => x.id !== childId),
-      }));
-      toast.success("Xóa danh mục con thành công");
+
+      // Tự động fetch lại data mới nhất từ server thay vì filter thủ công
+      await mutateCategory();
+
+      toast.success("Xóa danh mục con thành công", { id: toastId });
     } catch (err) {
-      console.error("Lỗi khi xóa danh mục con:", {
-        message: err.message,
-        status: err.response?.status,
-        data: err.response?.data,
-        fullError: err.toString(),
-      });
       let errorMessage = "Xóa danh mục con thất bại";
       if (err.response?.data) {
-        const errorData = err.response.data;
-        const errorString = JSON.stringify(errorData).toLowerCase();
+        const errorString = JSON.stringify(err.response.data).toLowerCase();
         if (
           errorString.includes("foreign key constraint") ||
           errorString.includes("referenced from table")
         ) {
           errorMessage = "Không thể xóa vì đang có sách liên kết.";
-        } else if (err.response.status === 400) {
-          errorMessage =
-            errorData.message || "Không thể xóa do có dữ liệu liên quan";
-        } else if (err.response.status === 404) {
-          errorMessage = "Danh mục con không tồn tại";
-        } else if (errorData.message) {
-          errorMessage = errorData.message;
         }
-      } else if (err.request) {
-        errorMessage = "Không thể kết nối đến server.";
-      } else {
-        errorMessage = "Lỗi không xác định: " + err.message;
       }
-      toast.error(errorMessage);
+      toast.error(errorMessage, { id: toastId });
     } finally {
       setShowDeleteModal(false);
       setDeleteTarget(null);
@@ -203,22 +188,26 @@ export default function EditCategoryPage() {
     setShowDeleteModal(true);
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="flex justify-center items-center h-screen">
-        <ThreeDot text="Loading" />
+      <div className="flex w-full h-screen bg-[#EFF3FB]">
+        <Sidebar />
+        <div className="flex-1 flex justify-center items-center">
+          <ThreeDot color="#062D76" size="large" text="Đang tải dữ liệu..." />
+        </div>
       </div>
     );
   }
 
   return (
     <div className="flex w-full min-h-screen bg-[#EFF3FB]">
+      <Toaster position="top-center" reverseOrder={false} />
       <Sidebar />
       <div className="flex-1 p-8 md:ml-52">
         <div className="flex items-center gap-4 mb-6">
           <Button
             onClick={() => router.replace("/books/categories")}
-            className="bg-[#062D76] p-2 rounded-full"
+            className="bg-[#062D76] p-2 rounded-full hover:bg-gray-700"
           >
             <Undo2 color="white" />
           </Button>
@@ -237,13 +226,13 @@ export default function EditCategoryPage() {
           <div className="flex gap-4 mt-5">
             <Button
               onClick={save}
-              className="bg-[#062D76] px-6 py-2 rounded flex items-center gap-2"
+              className="bg-[#062D76] px-6 py-2 rounded flex items-center gap-2 hover:bg-gray-700"
             >
               <Save color="white" /> Lưu
             </Button>
             <Button
               onClick={() => openDeleteModal("parent", null, data.name)}
-              className="bg-red-500 px-6 py-2 rounded flex items-center gap-2"
+              className="bg-red-500 px-6 py-2 rounded flex items-center gap-2 hover:bg-red-600"
             >
               <Trash2 color="white" /> Xóa
             </Button>
@@ -260,13 +249,13 @@ export default function EditCategoryPage() {
                   onClick={() =>
                     router.replace(`/books/categories/child/${ch.id}`)
                   }
-                  className="bg-[#6BE5FF] p-2 rounded"
+                  className="bg-[#6BE5FF] p-2 rounded hover:bg-[#5acde3]"
                 >
                   <Edit2 color="white" />
                 </Button>
                 <Button
                   onClick={() => openDeleteModal("child", ch.id, ch.name)}
-                  className="bg-red-500 p-2 rounded"
+                  className="bg-red-500 p-2 rounded hover:bg-red-600"
                 >
                   <Trash2 color="white" />
                 </Button>
@@ -276,13 +265,14 @@ export default function EditCategoryPage() {
 
           <Button
             onClick={() => setShowAddChildModal(true)}
-            className="mt-4 bg-[#062D76] text-white px-4 py-2 rounded flex items-center gap-2"
+            className="mt-4 bg-[#062D76] text-white px-4 py-2 rounded flex items-center gap-2 hover:bg-gray-700"
           >
             <PlusCircle /> Thêm danh mục con
           </Button>
         </div>
       </div>
 
+      {/* Delete Confirmation Modal */}
       {showDeleteModal && deleteTarget && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
@@ -298,7 +288,7 @@ export default function EditCategoryPage() {
                   setShowDeleteModal(false);
                   setDeleteTarget(null);
                 }}
-                className="bg-gray-300 px-4 py-2 rounded"
+                className="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400 text-black"
               >
                 Hủy
               </Button>
@@ -308,7 +298,7 @@ export default function EditCategoryPage() {
                     ? deleteParent()
                     : deleteChild(deleteTarget.id)
                 }
-                className="bg-red-500 px-4 py-2 rounded text-white"
+                className="bg-red-500 px-4 py-2 rounded text-white hover:bg-red-600"
               >
                 Xóa
               </Button>
@@ -316,6 +306,7 @@ export default function EditCategoryPage() {
           </div>
         </div>
       )}
+      {/* Add Child Modal */}
       {showAddChildModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
@@ -326,7 +317,7 @@ export default function EditCategoryPage() {
                   setShowAddChildModal(false);
                   setNewChildName("");
                 }}
-                className="p-1"
+                className="p-1 hover:bg-gray-100 rounded-full"
               >
                 <X color="gray" />
               </Button>
@@ -344,13 +335,13 @@ export default function EditCategoryPage() {
                   setShowAddChildModal(false);
                   setNewChildName("");
                 }}
-                className="bg-gray-300 px-4 py-2 rounded"
+                className="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400 text-black"
               >
                 Hủy
               </Button>
               <Button
                 onClick={addChild}
-                className="bg-[#062D76] px-4 py-2 rounded text-white"
+                className="bg-[#062D76] px-4 py-2 rounded text-white hover:bg-gray-700"
               >
                 Thêm
               </Button>

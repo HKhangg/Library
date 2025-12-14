@@ -1,218 +1,211 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState, useMemo } from "react";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { useParams } from "next/navigation";
 import { CalendarClock, Check, Search, X } from "lucide-react";
 import { ThreeDot } from "react-loading-indicators";
 import toast, { Toaster } from "react-hot-toast";
-
 import Sidebar from "@/app/components/sidebar/Sidebar";
 import axios from "axios";
+
+import useSWR, { mutate } from "swr";
+import { fetcher } from "@/lib/fetcher"; 
 const Page = () => {
   const { id } = useParams();
-  const [book, setBook] = useState(null);
-  const [childBookList, setChildBookList] = useState([]);
-  const [filterBooks, setFilterBooks] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState(false);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        const resBook = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/book/${id}`
-        );
-        if (!resBook.ok) throw new Error(`Lỗi khi lấy sách: ${resBook.status}`);
-        const data = await resBook.json();
-        setBook(data);
+  // 2. useSWR: Lấy thông tin Sách cha
+  const { data: book, isLoading: bookLoading } = useSWR(
+    id ? `${process.env.NEXT_PUBLIC_API_URL}/api/book/${id}` : null,
+    fetcher
+  );
 
-        const resChild = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/bookchild/book/${id}`
-        );
-        if (!resChild.ok)
-          throw new Error(`Lỗi khi lấy sách con: ${resChild.status}`);
-        const children = await resChild.json();
-        setChildBookList(children);
-      } catch (error) {
-        console.error(error);
-        window.alert(error.message || "Lỗi khi tải dữ liệu");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, [id]);
+  // 3. useSWR: Lấy danh sách Sách con
+  const childBooksApiUrl = id
+    ? `${process.env.NEXT_PUBLIC_API_URL}/api/bookchild/book/${id}`
+    : null;
+
+  const { data: childBookList = [], isLoading: childrenLoading, mutate: mutateChildren } = useSWR(
+    childBooksApiUrl,
+    fetcher,
+    {
+      revalidateOnFocus: true, // Auto refresh khi quay lại tab để cập nhật trạng thái mượn/trả
+    }
+  );
+
+  // Loading tổng
+  const loading = bookLoading || childrenLoading;
+
+  // 4. Xử lý Thêm Sách con
   const handleAddChild = async () => {
-    setActionLoading(true);
+    const toastId = toast.loading("Đang tạo sách con...");
     try {
-      const response = await axios.post(
+      await axios.post(
         `${process.env.NEXT_PUBLIC_API_URL}/api/bookchild/book/${id}/add`
       );
-      const newChildBook = response.data;
 
-      window.alert("Đã tạo sách con mới");
+      // Refresh lại danh sách sách con
+      mutateChildren();
 
-      setChildBookList((prev) => [
-        ...prev,
-        {
-          id: newChildBook.id,
-          status: "AVAILABLE",
-        },
-      ]);
+      toast.success("Đã tạo sách con mới thành công", { id: toastId });
     } catch (error) {
       console.error(error);
-      window.alert("Không thể thêm sách con");
-    } finally {
-      setActionLoading(false);
+      toast.error("Không thể thêm sách con", { id: toastId });
     }
   };
 
+  // 5. Xử lý Xóa Sách con
   const handleDeleteChild = async (childId) => {
-    setActionLoading(true);
+    const toastId = toast.loading("Đang xóa sách con...");
     try {
       await axios.delete(
         `${process.env.NEXT_PUBLIC_API_URL}/api/bookchild/${childId}`
       );
-      toast.success("Xóa sách con thành công");
-      setChildBookList((prev) =>
-        prev.map((child) =>
-          child.id === childId ? { ...child, status: "NOT_AVAILABLE" } : child
-        )
-      );
-    } catch {
-      toast.error("Xóa thất bại");
-    } finally {
-      setActionLoading(false);
+
+      // Refresh lại danh sách để cập nhật trạng thái (hoặc xóa khỏi list tùy API)
+      mutateChildren();
+
+      toast.success("Xóa sách con thành công", { id: toastId });
+    } catch (error) {
+      console.error(error);
+      toast.error("Xóa thất bại", { id: toastId });
     }
   };
 
-  const handleSearch = () => {
+  // 6. Logic Lọc & Thống kê (Client-side)
+  const { filteredBooks, borrowedCount, availableCount } = useMemo(() => {
+    const safeList = Array.isArray(childBookList) ? childBookList : [];
+
+    // Lọc theo search query
+    let filtered = safeList;
     if (searchQuery.trim()) {
-      const result = childBookList.filter(
-        (cb) => cb.id.toString() === searchQuery.trim()
+      filtered = safeList.filter((cb) =>
+        cb.id.toString().includes(searchQuery.trim())
       );
-      if (result.length === 0) toast.error("Không tìm thấy kết quả");
-      setFilterBooks(result);
-    } else {
-      setFilterBooks([]);
     }
-  };
 
-  const borrowedCount = childBookList.filter(
-    (cb) => cb.status === "BORROWED"
-  ).length;
-  const availableCount = book ? book.tongSoLuong - borrowedCount : 0;
+    // Thống kê
+    const borrowed = safeList.filter((cb) => cb.status === "BORROWED").length;
+    // Tính toán lại available dựa trên tổng số thực tế trừ đi số đang mượn
+    // Hoặc lấy từ book.soLuongCon nếu API book chính xác
+    const available = book ? book.tongSoLuong - borrowed : 0;
 
-  const BookCard = ({ book }) => (
+    return {
+      filteredBooks: filtered,
+      borrowedCount: borrowed,
+      availableCount: available,
+    };
+  }, [childBookList, searchQuery, book]);
+
+  // Component UI: BookCard
+  const BookCard = ({ bookData }) => (
     <div className="flex bg-white w-full rounded-lg shadow-lg p-6 gap-8">
       <img
-        src={book.hinhAnh?.[0] || "/placeholder.png"}
+        src={bookData.hinhAnh?.[0] || "/placeholder.png"}
         className="w-64 h-96 object-cover rounded-md"
+        alt={bookData.tenSach}
+        onError={(e) => (e.target.src = "/placeholder.png")}
       />
       <div className="flex flex-col gap-3 flex-1 text-sm md:text-base">
-        <p>
-          <strong>ID:</strong> {book.maSach}
-        </p>
-        <p>
-          <strong>Tên sách:</strong> {book.tenSach}
-        </p>
-        {/* <p><strong>Mô tả:</strong> {book.moTa}</p>*/}
-        <p>
-          <strong>Tác giả:</strong> {book.tenTacGia}
-        </p>
-        <p>
-          <strong>Nhà xuất bản:</strong> {book.nxb}
-        </p>
-        <p>
-          <strong>Năm xuất bản:</strong> {book.nam}
-        </p>
-        <p>
-          <strong>Tổng số lượng:</strong> {book.tongSoLuong}
-        </p>
-        <p>
-          <strong>Còn sẵn:</strong> {availableCount}
-        </p>
-        <p>
-          <strong>Thể loại chính:</strong> {book.categoryParentName}
-        </p>
-        <p>
-          <strong>Thể loại phụ:</strong> {book.categoryChildName}
-        </p>
-        <p>
-          <strong>Đã mượn:</strong> {book.soLuongMuon}
-        </p>
-        <p>
-          <strong>Đã xóa:</strong> {book.soLuongXoa}
-        </p>
+        <p><strong>ID:</strong> {bookData.maSach}</p>
+        <p><strong>Tên sách:</strong> {bookData.tenSach}</p>
+        <p><strong>Tác giả:</strong> {bookData.tenTacGia}</p>
+        <p><strong>Nhà xuất bản:</strong> {bookData.nxb}</p>
+        <p><strong>Năm xuất bản:</strong> {bookData.nam}</p>
+        <p><strong>Tổng số lượng:</strong> {bookData.tongSoLuong}</p>
+        <p><strong>Còn sẵn:</strong> {availableCount}</p>
+        <p><strong>Thể loại chính:</strong> {bookData.categoryParentName}</p>
+        <p><strong>Thể loại phụ:</strong> {bookData.categoryChildName}</p>
+        <p><strong>Đã mượn:</strong> {bookData.soLuongMuon}</p>
+        <p><strong>Đã xóa:</strong> {bookData.soLuongXoa}</p>
       </div>
     </div>
   );
 
-  const ChildBookCard = ({ book }) => (
+  // Component UI: ChildBookCard
+  const ChildBookCard = ({ childBook }) => (
     <div className="flex bg-white rounded-lg shadow p-4 items-center justify-between">
       <div className="flex items-center gap-2 font-medium">
-        <span>ID con: {book.id}</span>
-        {book.status === "AVAILABLE" && (
+        <span>ID con: {childBook.id}</span>
+        {childBook.status === "AVAILABLE" && (
           <Check className="w-5 h-5 text-green-500" />
         )}
-        {book.status === "BORROWED" && (
+        {childBook.status === "BORROWED" && (
           <CalendarClock className="w-5 h-5 text-yellow-500" />
         )}
-        {book.status === "NOT_AVAILABLE" && (
+        {childBook.status === "NOT_AVAILABLE" && (
           <X className="w-5 h-5 text-red-500" />
         )}
       </div>
       <Button
-        disabled={actionLoading}
-        onClick={() => handleDeleteChild(book.id)}
+        onClick={() => handleDeleteChild(childBook.id)}
         size="sm"
         variant="destructive"
+        className="bg-red-500 hover:bg-red-600 text-white"
       >
         Xóa
       </Button>
     </div>
   );
 
-  if (loading)
+  if (loading) {
     return (
-      <div className="flex">
+      <div className="flex bg-[#EFF3FB] min-h-screen">
         <Sidebar />
-        <div className="flex-1 flex items-center justify-center min-h-screen">
-          <ThreeDot color="#062D76" size="large" text="Đang tải..." />
+        <div className="flex-1 flex items-center justify-center">
+          <ThreeDot color="#062D76" size="large" text="Đang tải dữ liệu..." />
         </div>
       </div>
     );
+  }
 
   return (
     <div className="flex flex-row w-full min-h-screen bg-[#EFF3FB]">
+      <Toaster position="top-center" reverseOrder={false} />
       <Sidebar />
       <div className="flex-1 p-6 md:ml-52">
-        <div className="flex mb-6">
-          <Input
-            placeholder="Tìm kiếm sách con theo ID"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="flex-1 h-10 px-4 rounded-lg"
-          />
+        {/* Controls */}
+        <div className="flex mb-6 justify-between gap-4">
+          <div className="flex flex-1 gap-2">
+            <Input
+              placeholder="Tìm kiếm sách con theo ID"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="h-10 px-4 rounded-lg bg-white shadow-sm flex-1 max-w-md"
+            />
+            <Button
+              className="w-12 h-10 bg-[#062D76] hover:bg-gray-700"
+              onClick={() => { }} // Search is handled by state reactive
+            >
+              <Search className="w-6 h-6 text-white" />
+            </Button>
+          </div>
           <Button
-            onClick={handleSearch}
-            className="ml-4 w-12 h-10 bg-[#062D76] hover:bg-gray-700"
+            onClick={handleAddChild}
+            className="bg-green-600 hover:bg-green-700 text-white"
           >
-            <Search className="w-6 h-6 text-white" />
+            + Thêm sách con
           </Button>
         </div>
-        {/* Book details */}
-        {book && <BookCard book={book} />}
-        <div className="mt-6"></div>
-        {/* Child books grid */}
-        <div className="grid grid-cols-4 gap-4 mt-8">
-          {(filterBooks.length ? filterBooks : childBookList).map((cb) => (
-            <ChildBookCard key={cb.id} book={cb} />
-          ))}
+
+        {/* Book Details */}
+        {book && <BookCard bookData={book} />}
+
+        {/* Child Books List */}
+        <div className="mt-8">
+          <h3 className="text-xl font-bold mb-4 text-[#062D76]">Danh sách sách con ({filteredBooks.length})</h3>
+
+          {filteredBooks.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {filteredBooks.map((cb) => (
+                <ChildBookCard key={cb.id} childBook={cb} />
+              ))}
+            </div>
+          ) : (
+            <p className="text-center text-gray-500">Không tìm thấy sách con nào.</p>
+          )}
         </div>
       </div>
     </div>

@@ -1,25 +1,24 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import Sidebar from "@/app/components/sidebar/Sidebar";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { ArrowUpFromLine, ChevronDown, CircleCheck, Undo2 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
-
-import toast from "react-hot-toast";
-
+import toast, { Toaster } from "react-hot-toast";
 import { ThreeDot } from "react-loading-indicators";
 import axios from "axios";
 
-// ==== CẤU HÌNH CHUNG CHO AXIOS ====
-axios.defaults.baseURL = `${process.env.NEXT_PUBLIC_API_URL}`;
-axios.defaults.headers.common["Content-Type"] = "application/json";
+import useSWR, { mutate } from "swr";
+import { fetcher } from "@/lib/fetcher"; 
+
+axios.defaults.baseURL = process.env.NEXT_PUBLIC_API_URL;
 
 function Page() {
-  const [loading, setLoading] = useState(false);
   const router = useRouter();
   const { id } = useParams();
+
   const fileInputRef = useRef(null);
   const fileInputRef1 = useRef(null);
   const fileInputRef2 = useRef(null);
@@ -30,104 +29,83 @@ function Page() {
   const [publisher, setPublisher] = useState("");
   const [year, setYear] = useState("");
   const [quantity, setQuantity] = useState("");
-  const [originQuantity, setOriginQuantity] = useState(0);
   const [description, setDescription] = useState("");
-  const [category, setCategory] = useState(null);
-  const [category2, setCategory2] = useState(null);
+  const [category, setCategory] = useState(""); // Tên thể loại chính
+  const [category2, setCategory2] = useState(""); // Tên thể loại phụ
   const [weight, setWeight] = useState("");
   const [price, setPrice] = useState("");
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState(""); // Trạng thái sách
 
-  const [errors, setErrors] = useState({
-    year: false,
-    quantity: false,
-    weight: false,
-    price: false,
-  });
-
-  // State ảnh
   const [image, setImage] = useState(
     Array(4).fill({ filePreview: null, selectedFile: null })
   );
 
-  // Danh sách categories
-  const [totalCate, setTotalCate] = useState([]);
-  const [cateList, setCateList] = useState([]);
-  const [cate2List, setCate2List] = useState([]);
-
-  // Dropdown
   const [isCateListOpen, setIsCateListOpen] = useState(false);
   const [isCateList2Open, setIsCateList2Open] = useState(false);
 
-  const openCategoryList = () => setIsCateListOpen((o) => !o);
-  const openCategory2List = () => setIsCateList2Open((o) => !o);
-
-  // Refs
-  const isFirstRender = useRef(true);
-  const fileRefs = [useRef(), useRef(), useRef(), useRef()];
-
-  // Back
-  const handleGoBack = () => router.back();
-
-  const isDeleted = status === "DA_XOA";
-
-  useEffect(() => {
-    if (!id) return;
-
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        // categories
-        const cats = (await axios.get("/api/category")).data;
-        setTotalCate(cats);
-        setCateList(cats.map((c) => c.name));
-
-        const data = (await axios.get(`/api/book/${id}`)).data;
-        setStatus(data.trangThai || "");
-        setBookname(data.tenSach || "");
-        setAuthor(data.tenTacGia || "");
-        setPublisher(data.nxb || "");
-        setYear(data.nam?.toString() || "");
-        setQuantity(data.tongSoLuong?.toString() || "");
-        setOriginQuantity(data.tongSoLuong || 0);
-        setQuantity("");
-        setDescription(data.moTa || "");
-        setCategory(data.categoryChild?.parent?.name || null);
-        setCategory2(data.categoryChild?.name || null);
-        setWeight(data.trongLuong?.toString() || "");
-        setPrice(data.donGia?.toString() || "");
-
-        setImage((prev) =>
-          prev.map((_, idx) => ({
-            filePreview: data.hinhAnh?.[idx] || null,
-            selectedFile: null,
-          }))
-        );
-      } catch (err) {
-        console.error(err);
-        toast.error("Không thể tải dữ liệu");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, [id]);
-
-  // ==== UPDATE cate2List khi thay cate cha ====
-  useEffect(() => {
-    if (category) {
-      const sel = totalCate.find((c) => c.name === category);
-      setCate2List(sel?.children.map((ch) => ch.name) || []);
+  const { data: totalCate = [], isLoading: loadingCategories } = useSWR(
+    `${process.env.NEXT_PUBLIC_API_URL}/api/category`,
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      dedupingInterval: 60000,
     }
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
-      return;
+  );
+
+  // 3. useSWR: Lấy chi tiết Sách
+  // Key là null nếu chưa có ID
+  const { data: bookData, isLoading: loadingBook, mutate: mutateBook } = useSWR(
+    id ? `${process.env.NEXT_PUBLIC_API_URL}/api/book/${id}` : null,
+    fetcher,
+    {
+      revalidateOnFocus: false,
     }
-    setCategory2(null);
+  );
+
+  // 4. Populate Data vào Form (Chạy khi bookData tải xong)
+  useEffect(() => {
+    if (bookData) {
+      setStatus(bookData.trangThai || "");
+      setBookname(bookData.tenSach || "");
+      setAuthor(bookData.tenTacGia || "");
+      setPublisher(bookData.nxb || "");
+      setYear(bookData.nam?.toString() || "");
+      // Logic riêng cho số lượng: Input để trống để nhập số lượng thêm
+      setQuantity("");
+      setDescription(bookData.moTa || "");
+
+      // Populate Categories
+      setCategory(bookData.categoryChild?.parent?.name || "");
+      setCategory2(bookData.categoryChild?.name || "");
+
+      setWeight(bookData.trongLuong?.toString() || "");
+      setPrice(bookData.donGia?.toString() || "");
+
+      // Populate Images
+      setImage((prev) =>
+        prev.map((_, idx) => ({
+          filePreview: bookData.hinhAnh?.[idx] || null,
+          selectedFile: null,
+        }))
+      );
+    }
+  }, [bookData]);
+
+  // Derived State cho Categories
+  const cateList = useMemo(() => totalCate.map((c) => c.name), [totalCate]);
+
+  const cate2List = useMemo(() => {
+    if (!category) return [];
+    const selectedCate = totalCate.find((c) => c.name === category);
+    return selectedCate?.children?.map((ch) => ch.name) || [];
   }, [category, totalCate]);
 
-  // ==== XỬ LÝ FILE CHANGE ====
+  const isDeleted = status === "DA_XOA";
+  const loading = loadingCategories || loadingBook;
+
+  // Handlers
+  const handleGoBack = () => router.back();
+
   const handleFileChange = (index, e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -141,32 +119,24 @@ function Page() {
     });
   };
 
-  // ==== UPLOAD ẢNH ====
   const uploadImagesToCloudinary = async () => {
     const formData = new FormData();
-    let has = false;
+    let hasFile = false;
     image.forEach((img) => {
       if (img.selectedFile) {
-        formData.append("file", img.selectedFile);
-        has = true;
+        formData.append("files", img.selectedFile);
+        hasFile = true;
       }
     });
-    if (!has) return [];
-    const res = await axios.post("/upload/image", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
-    return res.data;
-  };
 
-  const handleValidation = () => {
-    const newErrors = {
-      year: year && (isNaN(+year) || +year <= 0),
-      quantity: quantity && (isNaN(+quantity) || +quantity < 0),
-      weight: weight && (isNaN(+weight) || +weight <= 0),
-      price: price && (isNaN(+price) || +price <= 0),
-    };
-    setErrors(newErrors);
-    return !Object.values(newErrors).some((error) => error);
+    if (!hasFile) return [];
+
+    const res = await axios.post(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/upload/image`,
+      formData,
+      { headers: { "Content-Type": "multipart/form-data" } }
+    );
+    return res.data;
   };
 
   const handleSubmit = async () => {
@@ -174,143 +144,134 @@ function Page() {
       toast.error("ID sách không hợp lệ");
       return;
     }
-    if (!handleValidation()) {
-      toast.error("Vui lòng điền đúng thông tin");
+
+    // Validation cơ bản
+    if (
+      !bookname || !author || !year || !publisher ||
+      !description || !category || !category2 || !weight || !price
+    ) {
+      toast.error("Vui lòng điền đầy đủ thông tin");
       return;
     }
 
+    // Xử lý logic KHÔI PHỤC SÁCH (Nếu đã xóa)
     if (isDeleted) {
       const newQ = +quantity;
       if (isNaN(newQ) || newQ <= 0) {
-        toast.error("Số lượng phải > 0");
+        toast.error("Số lượng khôi phục phải > 0");
         return;
       }
-      setLoading(true);
+
+      const toastId = toast.loading("Đang khôi phục sách...");
       try {
-        await axios.patch(`/api/book/${id}`, { tongSoLuong: newQ });
-        toast.success("Sách đã được phục hồi thành công");
-        router.back();
+        await axios.patch(`${process.env.NEXT_PUBLIC_API_URL}/api/book/${id}`, { tongSoLuong: newQ });
+
+        // Refresh lại data
+        mutateBook();
+
+        toast.success("Sách đã được phục hồi thành công", { id: toastId });
+        setTimeout(() => router.back(), 1000);
       } catch (err) {
-        console.error("Lỗi chi tiết:", err.response?.data || err.message);
-        toast.error(err.response?.data?.message || "Lỗi server");
-      } finally {
-        setLoading(false);
+        console.error("Lỗi:", err);
+        toast.error("Khôi phục thất bại", { id: toastId });
       }
       return;
     }
 
-    const initialData = (await axios.get(`/api/book/${id}`)).data;
-    const addQty = +quantity;
+    // Xử lý logic CẬP NHẬT SÁCH
+    const addQty = quantity === "" ? 0 : +quantity; // Nếu không nhập thì coi là 0 (không thêm)
     if (isNaN(addQty) || addQty < 0) {
       toast.error("Số lượng thêm phải >= 0");
       return;
     }
+
+    // So sánh sự thay đổi để tạo payload
     const bookUpdates = {};
+    if (bookname !== bookData.tenSach) bookUpdates.tenSach = bookname;
+    if (description !== bookData.moTa) bookUpdates.moTa = description;
+    if (author !== bookData.tenTacGia) bookUpdates.tenTacGia = author;
+    if (publisher !== bookData.nxb) bookUpdates.nxb = publisher;
+    if (+year !== bookData.nam) bookUpdates.nam = +year;
+    if (+weight !== bookData.trongLuong) bookUpdates.trongLuong = +weight;
+    if (+price !== bookData.donGia) bookUpdates.donGia = +price;
 
-    if (bookname && bookname !== initialData.tenSach)
-      bookUpdates.tenSach = bookname;
-    if (description && description !== initialData.moTa)
-      bookUpdates.moTa = description;
-    if (author && author !== initialData.tenTacGia)
-      bookUpdates.tenTacGia = author;
-    if (publisher && publisher !== initialData.nxb) bookUpdates.nxb = publisher;
-    if (year && !isNaN(+year) && +year !== initialData.nam)
-      bookUpdates.nam = +year;
-    if (weight && !isNaN(+weight) && +weight !== initialData.trongLuong)
-      bookUpdates.trongLuong = +weight;
-    if (price && !isNaN(+price) && +price !== initialData.donGia)
-      bookUpdates.donGia = +price;
-
+    // Logic cập nhật số lượng (Cộng thêm)
+    // Backend API logic: 'tongSoLuong' gửi lên sẽ được coi là số lượng CẦN THÊM VÀO
+    // Nếu bạn muốn giữ nguyên số lượng cũ, gửi 0 hoặc không gửi (tùy API của bạn)
+    // Theo logic code cũ: gửi 'tongSoLuong' = addQty
     bookUpdates.tongSoLuong = addQty;
 
+    // Logic cập nhật Category
     if (category2) {
-      const sel = totalCate
-        .find((c) => c.name === category)
-        ?.children.find((ch) => ch.name === category2);
-      if (sel && sel.id !== initialData.categoryChild?.id) {
-        bookUpdates.categoryChildId = sel.id;
+      const selParent = totalCate.find((c) => c.name === category);
+      const selChild = selParent?.children.find((ch) => ch.name === category2);
+
+      if (selChild && selChild.id !== bookData.categoryChild?.id) {
+        bookUpdates.categoryChildId = selChild.id;
       }
     }
 
-    const updates = {
-      book: Object.keys(bookUpdates).length > 0 ? bookUpdates : {},
-      quantity: +quantity || initialData.tongSoLuong || 0,
-    };
-
-    if (Object.keys(bookUpdates).length === 0) {
+    if (Object.keys(bookUpdates).length === 0 && addQty === 0 && !image.some(i => i.selectedFile)) {
       toast("Không có thay đổi nào để cập nhật", { icon: "⚠️" });
       return;
     }
 
-    // Upload ảnh nếu có
-    let newImgs = [];
+    const toastId = toast.loading("Đang cập nhật sách...");
+
     try {
-      newImgs = await uploadImagesToCloudinary();
-      // Chỉ gán hinhAnh khi upload thực sự có file mới
+      // Upload ảnh nếu có
+      let newImgs = await uploadImagesToCloudinary();
       if (Array.isArray(newImgs) && newImgs.length > 0) {
+        // Cần merge với ảnh cũ hoặc thay thế tùy logic (Code cũ thay thế bằng newImgs trả về)
+        // Nếu API upload trả về full list ảnh mới thì gán luôn
         bookUpdates.hinhAnh = newImgs;
       }
-    } catch {
-      toast.error("Upload ảnh thất bại");
-      return;
-    }
 
-    setLoading(true);
-    try {
-      await axios.patch(`/api/book/${id}`, bookUpdates);
-      toast.success("Cập nhật sách thành công");
-      router.push(`/books/details/${id}`);
+      // Gửi request cập nhật
+      await axios.patch(`${process.env.NEXT_PUBLIC_API_URL}/api/book/${id}`, bookUpdates);
+
+      // Refresh SWR
+      mutateBook();
+
+      toast.success("Cập nhật sách thành công", { id: toastId });
+      // setTimeout(() => router.push(`/books/details/${id}`), 1000); 
+      // Không cần redirect nếu muốn ở lại trang edit, hoặc redirect tùy ý
+
     } catch (err) {
-      console.error("Lỗi chi tiết:", err.response?.data || err.message);
-      toast.error(err.response?.data?.message || "Lỗi server rồi bà");
-    } finally {
-      setLoading(false);
+      console.error("Lỗi:", err);
+      const msg = err.response?.data?.message || "Cập nhật thất bại";
+      toast.error(msg, { id: toastId });
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex">
-        <Sidebar />
-        <div className="md:ml-52 flex-1 flex items-center justify-center min-h-screen">
-          <ThreeDot
-            color="#062D76"
-            size="large"
-            text="Loading..."
-            variant="bounce"
-          />
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-row w-full h-full min-h-screen bg-[#EFF3FB] pb-15">
+      <Toaster position="top-center" reverseOrder={false} />
       <Sidebar />
       {loading ? (
         <div className="flex md:ml-52 w-full h-screen justify-center items-center">
           <ThreeDot
             color="#062D76"
             size="large"
-            text="Vui lòng chờ"
+            text="Đang tải dữ liệu..."
             variant="bounce"
             textColor="#062D76"
           />
         </div>
       ) : (
         <div className="flex w-full flex-col py-6 md:ml-52 relative mt-10 gap-2 items-center px-10">
-          {/* Nút Back */}
-          <div className="absolute top-5 left-5 md:left-57 fixed">
+          {/* Nút Quay Lại */}
+          <div className="absolute top-5 left-5 md:left-57 fixed z-10">
             <Button
               title={"Quay Lại"}
-              className="bg-[#062D76] rounded-3xl w-10 h-10"
+              className="bg-[#062D76] rounded-3xl w-10 h-10 hover:bg-gray-700"
               onClick={handleGoBack}
             >
               <Undo2 className="w-12 h-12" color="white" />
             </Button>
           </div>
 
-          {/* Form nhập liệu */}
+          {/* Form Fields */}
           <div className="flex flex-col w-full gap-[5px] md:gap-[10px]">
             <p className="font-semibold text-lg mt-3">Tên Sách</p>
             <Input
@@ -362,34 +323,39 @@ function Page() {
 
           <div className="flex w-full justify-between gap-10">
             <div className="flex flex-col w-2/3 gap-[5px] md:gap-[10px]">
-              <p className="font-semibold text-lg mt-3">Số Sách Thêm</p>
+              <p className="font-semibold text-lg mt-3">
+                {isDeleted ? "Số lượng khôi phục" : "Số Sách Thêm (Nhập 0 nếu không thêm)"}
+              </p>
               <Input
                 type="number"
-                placeholder="Nhập số sách muốn thêm"
+                placeholder="Nhập số lượng"
                 className="font-semibold rounded-lg w-full h-10 flex items-center px-5 bg-white"
                 value={quantity}
                 onChange={(e) => setQuantity(e.target.value)}
               />
             </div>
+
+            {/* Dropdown Category Parent */}
             <div className="flex flex-col w-full gap-[5px] md:gap-[10px] space-y-2 relative inline-block text-left">
               <p className="font-semibold text-lg mt-3">Thể Loại Chính</p>
               <Button
                 title={"Thể Loại Chính"}
                 className="bg-white text-black rounded-lg w-full h-10 hover:bg-gray-300 flex justify-between"
-                onClick={openCategoryList}
+                onClick={() => setIsCateListOpen(!isCateListOpen)}
                 disabled={isDeleted}
               >
                 {category || "Chọn Thể Loại Chính"}
                 <ChevronDown className="w-12 h-12" color="#062D76" />
               </Button>
               {isCateListOpen && (
-                <div className="absolute bg-white rounded-lg w-full z-50 shadow-lg">
+                <div className="absolute bg-white rounded-lg w-full z-50 shadow-lg max-h-60 overflow-y-auto">
                   {cateList.map((cate, index) => (
                     <Button
                       key={index}
                       className="flex justify-start block w-full px-4 py-2 text-left bg-white text-black hover:bg-gray-300 items-center gap-2"
                       onClick={() => {
                         setCategory(cate);
+                        setCategory2(""); // Reset con khi cha thay đổi
                         setIsCateListOpen(false);
                       }}
                     >
@@ -399,44 +365,49 @@ function Page() {
                 </div>
               )}
             </div>
+
+            {/* Dropdown Category Child */}
             <div className="flex flex-col w-full gap-[5px] md:gap-[10px] space-y-2 relative inline-block text-left">
               <p className="font-semibold text-lg mt-3">Thể Loại Phụ</p>
               <Button
                 title={"Thể Loại Phụ"}
                 className="bg-white text-black rounded-lg w-full h-10 hover:bg-gray-300 flex justify-between"
-                onClick={openCategory2List}
-                disabled={isDeleted}
+                onClick={() => setIsCateList2Open(!isCateList2Open)}
+                disabled={isDeleted || !category}
               >
                 {category2 || "Chọn Thể Loại Phụ"}
                 <ChevronDown className="w-12 h-12" color="#062D76" />
               </Button>
               {isCateList2Open && (
-                <div className="absolute bg-white rounded-lg w-full z-50 shadow-lg">
-                  {cate2List.map((cate, index) => (
-                    <Button
-                      key={index}
-                      className="flex justify-start block w-full px-4 py-2 text-left bg-white text-black hover:bg-gray-300 items-center gap-2"
-                      onClick={() => {
-                        setCategory2(cate);
-                        setIsCateList2Open(false);
-                      }}
-                    >
-                      {cate}
-                    </Button>
-                  ))}
+                <div className="absolute bg-white rounded-lg w-full z-50 shadow-lg max-h-60 overflow-y-auto">
+                  {cate2List.length > 0 ? (
+                    cate2List.map((cate, index) => (
+                      <Button
+                        key={index}
+                        className="flex justify-start block w-full px-4 py-2 text-left bg-white text-black hover:bg-gray-300 items-center gap-2"
+                        onClick={() => {
+                          setCategory2(cate);
+                          setIsCateList2Open(false);
+                        }}
+                      >
+                        {cate}
+                      </Button>
+                    ))
+                  ) : (
+                    <p className="p-2 text-gray-500 text-center">Không có danh mục con</p>
+                  )}
                 </div>
               )}
             </div>
           </div>
+
           <div className="flex w-full justify-between gap-10">
             <div className="flex flex-col w-2/3 gap-[5px] md:gap-[10px]">
               <p className="font-semibold text-lg mt-3">Trọng Lượng (gram)</p>
               <Input
                 type="number"
                 placeholder="Nhập trọng lượng"
-                className={`font-semibold rounded-lg w-full h-10 flex items-center px-5 bg-white ${
-                  errors.weight ? "border-red-500" : ""
-                }`}
+                className="font-semibold rounded-lg w-full h-10 px-5 bg-white"
                 disabled={isDeleted}
                 value={weight}
                 onChange={(e) => setWeight(e.target.value)}
@@ -447,9 +418,7 @@ function Page() {
               <Input
                 type="number"
                 placeholder="Nhập đơn giá"
-                className={`font-semibold rounded-lg w-full h-10 flex items-center px-5 bg-white ${
-                  errors.price ? "border-red-500" : ""
-                }`}
+                className="font-semibold rounded-lg w-full h-10 px-5 bg-white"
                 disabled={isDeleted}
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
@@ -472,133 +441,52 @@ function Page() {
           <div className="flex flex-col w-full gap-[5px] md:gap-[10px]">
             <p className="font-semibold text-lg mt-3">Hình ảnh</p>
             <div className="grid grid-cols-4 gap-4">
-              <div className="flex flex-col space-y-3">
-                {image[0].filePreview ? (
-                  <img
-                    src={image[0].filePreview}
-                    className="w-[290px] h-[410px] rounded-lg"
-                    width={145}
-                    height={205}
-                    alt={"Ảnh Bìa"}
-                  />
-                ) : (
-                  <div className="w-[290px] h-[410px] bg-gray-300 rounded-lg flex justify-center items-center text-gray-700">
-                    Không có hình ảnh
-                  </div>
-                )}
-                <Button
-                  className="flex w-[290px] bg-[#062D76]"
-                  onClick={() => fileInputRef.current.click()}
-                >
-                  <ArrowUpFromLine className="w-12 h-12" color="white" />
-                  Tải Ảnh Bìa
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => handleFileChange(0, e)}
-                    ref={fileInputRef}
-                  />
-                </Button>
-              </div>
-              <div className="flex flex-col space-y-3">
-                {image[1].filePreview ? (
-                  <img
-                    src={image[1].filePreview}
-                    className="w-[290px] h-[410px] rounded-lg"
-                    width={145}
-                    height={205}
-                    alt={"Ảnh Xem Trước 1"}
-                  />
-                ) : (
-                  <div className="w-[290px] h-[410px] bg-gray-300 rounded-lg flex justify-center items-center text-gray-700">
-                    Không có hình ảnh
-                  </div>
-                )}
-                <Button
-                  className="flex w-[290px] bg-[#062D76]"
-                  onClick={() => fileInputRef1.current.click()}
-                >
-                  <ArrowUpFromLine className="w-12 h-12" color="white" />
-                  Tải Ảnh Xem Trước
-                  <input
-                    type="file"
+              {[0, 1, 2, 3].map((index) => (
+                <div key={index} className="flex flex-col space-y-3">
+                  {image[index].filePreview ? (
+                    <img
+                      src={image[index].filePreview}
+                      className="w-[290px] h-[410px] rounded-lg object-cover"
+                      alt={`Ảnh ${index}`}
+                    />
+                  ) : (
+                    <div className="w-[290px] h-[410px] bg-gray-300 rounded-lg flex justify-center items-center text-gray-700">
+                      Không có hình ảnh
+                    </div>
+                  )}
+                  <Button
+                    className="flex w-[290px] bg-[#062D76] hover:bg-gray-700"
                     disabled={isDeleted}
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => handleFileChange(1, e)}
-                    ref={fileInputRef1}
-                  />
-                </Button>
-              </div>
-              <div className="flex flex-col space-y-3">
-                {image[2].filePreview ? (
-                  <img
-                    src={image[2].filePreview}
-                    className="w-[290px] h-[410px] rounded-lg"
-                    width={145}
-                    height={205}
-                    alt={"Ảnh Xem Trước 2"}
-                  />
-                ) : (
-                  <div className="w-[290px] h-[410px] bg-gray-300 rounded-lg flex justify-center items-center text-gray-700">
-                    Không có hình ảnh
-                  </div>
-                )}
-                <Button
-                  className="flex w-[290px] bg-[#062D76]"
-                  onClick={() => fileInputRef2.current.click()}
-                >
-                  <ArrowUpFromLine className="w-12 h-12" color="white" />
-                  Tải Ảnh Xem Trước
-                  <input
-                    type="file"
-                    disabled={isDeleted}
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => handleFileChange(2, e)}
-                    ref={fileInputRef2}
-                  />
-                </Button>
-              </div>
-              <div className="flex flex-col space-y-3">
-                {image[3].filePreview ? (
-                  <img
-                    src={image[3].filePreview}
-                    className="w-[290px] h-[410px] rounded-lg"
-                    width={145}
-                    height={205}
-                    alt={"Ảnh Xem Trước 3"}
-                  />
-                ) : (
-                  <div className="w-[290px] h-[410px] bg-gray-300 rounded-lg flex justify-center items-center text-gray-700">
-                    Không có hình ảnh
-                  </div>
-                )}
-                <Button
-                  className="flex w-[290px] bg-[#062D76]"
-                  onClick={() => fileInputRef3.current.click()}
-                >
-                  <ArrowUpFromLine className="w-12 h-12" color="white" />
-                  Tải Ảnh Xem Trước
-                  <input
-                    type="file"
-                    disabled={isDeleted}
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => handleFileChange(3, e)}
-                    ref={fileInputRef3}
-                  />
-                </Button>
-              </div>
+                    onClick={() => {
+                      const refs = [fileInputRef, fileInputRef1, fileInputRef2, fileInputRef3];
+                      refs[index].current.click();
+                    }}
+                  >
+                    <ArrowUpFromLine className="w-12 h-12" color="white" />
+                    {index === 0 ? "Tải Ảnh Bìa" : "Tải Ảnh Xem Trước"}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => handleFileChange(index, e)}
+                      ref={
+                        index === 0 ? fileInputRef :
+                          index === 1 ? fileInputRef1 :
+                            index === 2 ? fileInputRef2 :
+                              fileInputRef3
+                      }
+                    />
+                  </Button>
+                </div>
+              ))}
             </div>
           </div>
 
-          <div className="w-full bottom-0 px-10 left-0 md:left-52 md:w-[calc(100%-208px)] fixed h-18 bg-white flex items-center justify-between">
+          <div className="w-full bottom-0 px-10 left-0 md:left-52 md:w-[calc(100%-208px)] fixed h-18 bg-white flex items-center justify-between z-20 shadow-md">
             <div></div>
             <Button
               title={"Hoàn Tất"}
-              className="rounded-3xl w-40 h-12 bg-[#062D76]"
+              className={`rounded-3xl w-40 h-12 bg-[#062D76] hover:bg-gray-700`}
               onClick={handleSubmit}
             >
               <CircleCheck className="w-12 h-12" color="white" />
