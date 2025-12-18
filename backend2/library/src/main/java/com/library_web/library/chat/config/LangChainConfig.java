@@ -163,7 +163,7 @@ public class LangChainConfig {
     }
     
     @Bean
-    public ChatLanguageModel chatLanguageMoxdel() { 
+    public ChatLanguageModel chatLanguageModel() { 
         return GoogleAiGeminiChatModel.builder()
                 .apiKey(geminiApiKey)
                 .modelName("gemini-2.5-flash")

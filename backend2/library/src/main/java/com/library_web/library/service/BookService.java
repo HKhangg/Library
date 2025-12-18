@@ -2,7 +2,10 @@ package com.library_web.library.service;
 
 import com.library_web.library.model.Book;
 
+import dev.langchain4j.rag.content.Content;
+
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
@@ -45,5 +48,7 @@ public interface BookService {
      List<Book> getAllBooksV2(String filter);
     List<Book> getBooksByCategoryChildV2(String categoryChildId, String filter);
      List<Book> getBooksByCategoryParentV2(Long categoryParentId, String filter);
+     List<Book> getBooksByListIds(List<Long> ids);    
+     List<Book> getBooksByListCategoryChildIds(List<Long> ids);
 
 }
