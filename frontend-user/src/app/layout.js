@@ -80,6 +80,7 @@ import FloatingIcons from "@/app/components/FloatingIcons";
 
 import { Toaster } from "sonner";
 import { CartProvider } from "./context/CartContext";
+import { NotificationProvider } from "./context/NotificationContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -121,12 +122,14 @@ export default function RootLayout({ children }) {
             clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID}
           >
             <CartProvider>
-              <FacebookSDK>
-                <div className="w-full min-h-screen bg-white dark:bg-gray-900 transition-colors duration-300">
-                  <RequireAuth>{children}</RequireAuth>
+              <NotificationProvider>
+                <FacebookSDK>
+                  <div className="w-full min-h-screen bg-white dark:bg-gray-900 transition-colors duration-300">
+                    <RequireAuth>{children}</RequireAuth>
                 </div>
               </FacebookSDK>
-            </CartProvider>
+            </NotificationProvider>
+          </CartProvider>
             
           </GoogleOAuthProvider>
         </Providers>

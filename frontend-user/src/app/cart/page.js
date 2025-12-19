@@ -7,42 +7,38 @@ import { ThreeDot } from "react-loading-indicators";
 import { toast } from "sonner";
 import { useCart } from "@/app/context/CartContext";
 import useSWR, { mutate } from "swr";
+import { useNotification } from "@/app/context/NotificationContext";
 
-// Fetcher dùng chung cho GET request
 const fetcher = (url) => axios.get(url).then((res) => res.data);
 
 const Page = () => {
   const [selected, setSelected] = useState([]);
   const [user, setUser] = useState(null);
 
-  // Lấy hàm update Header từ Context
   const { fetchCart: fetchCartCount } = useCart();
 
-  // Lấy user từ localStorage (client-side only)
+  const { refreshNotifications } = useNotification();
+
   useEffect(() => {
     const storedUser = JSON.parse(localStorage.getItem("persist:root"));
     setUser(storedUser);
   }, []);
 
-  // 2. useSWR: Lấy Cài đặt (Max Borrowed Books)
   const { data: settingsData } = useSWR(
     `${process.env.NEXT_PUBLIC_API_URL}/api/settings`,
     fetcher
   );
   const maxAllowed = settingsData?.maxBorrowedBooks || 5;
 
-  // 3. useSWR: Lấy Giỏ hàng
-  // Key phụ thuộc vào user.id, nếu chưa có user thì không fetch (null)
   const cartApiUrl = user?.id
     ? `${process.env.NEXT_PUBLIC_API_URL}/api/cart/${user.id}`
     : null;
 
   const { data: cartResponse, isLoading } = useSWR(cartApiUrl, fetcher, {
-    revalidateOnFocus: true, // Tự động làm mới khi quay lại tab
-    fallbackData: { data: [] }, // Dữ liệu mặc định
+    revalidateOnFocus: true,
+    fallbackData: { data: [] },
   });
 
-  // Trích xuất mảng sách từ response (API trả về object có thuộc tính .data)
   const books = Array.isArray(cartResponse?.data) ? cartResponse.data : [];
 
   const toggleBook = (bookId, checked) => {
@@ -56,7 +52,6 @@ const Page = () => {
   const toggleAll = (checked) =>
     setSelected(checked ? books.map((b) => b.bookId) : []);
 
-  // Hàm xóa sách khỏi giỏ dùng mutate
   const handleDeleteBooks = async () => {
     if (selected.length === 0) {
       toast.warning("Vui lòng chọn sách cần xóa");
@@ -70,28 +65,22 @@ const Page = () => {
         { data: selected }
       );
 
-      // A. Cập nhật dữ liệu tại chỗ (Local Mutate) để giao diện nhanh hơn
-      // (Báo cho SWR biết dữ liệu mới là gì mà không cần chờ server trả lời ngay)
       mutate(cartApiUrl, {
         ...cartResponse,
         data: books.filter(b => !selected.includes(b.bookId))
       }, false);
 
-      // B. Gọi API ngầm để xác thực lại dữ liệu chuẩn
       mutate(cartApiUrl);
-
-      // C. Cập nhật Header
       fetchCartCount();
 
       toast.success(`Đã xóa ${selected.length} sách khỏi giỏ.`, { id: toastId });
-      setSelected([]); // Reset lựa chọn
+      setSelected([]);
     } catch (error) {
       console.error(error);
       toast.error("Đã có lỗi khi xóa sách!", { id: toastId });
     }
   };
 
-  // Hàm mượn sách từ giỏ dùng mutate
   const handleBorrowBooks = async () => {
     if (selected.length === 0) {
       toast.warning("Vui lòng chọn sách để mượn");
@@ -100,9 +89,8 @@ const Page = () => {
 
     const toastId = toast.loading("Đang tạo phiếu mượn...");
     try {
-      const booksInCart = selected; // Mảng ID sách
+      const booksInCart = selected;
 
-      // Payload chuẩn cho backend
       const payload = {
         userId: parseInt(user.id, 10),
         borrowedBooks: booksInCart.map((bookId) => ({
@@ -122,20 +110,20 @@ const Page = () => {
       if (response.status === 200) {
         toast.success("Phiếu mượn đã được tạo!", { id: toastId });
 
-        // Xóa sách khỏi giỏ hàng sau khi mượn
         await axios.delete(
           `${process.env.NEXT_PUBLIC_API_URL}/api/cart/${user.id}/remove/books`,
           { data: booksInCart }
         );
 
-        // A. Cập nhật SWR (Làm mới giỏ hàng)
         mutate(cartApiUrl);
-
-        // B. Cập nhật Header
         fetchCartCount();
 
-        // C. Chuyển trang
-        window.location.href = "/borrowed-card";
+        refreshNotifications();
+
+        setTimeout(() => {
+          window.location.href = "/borrowed-card";
+        }, 500);
+        
       } else {
         toast.error("Không thể tạo phiếu mượn", { id: toastId });
       }
@@ -163,7 +151,6 @@ const Page = () => {
               </h2>
             </div>
 
-            {/* Loading State */}
             {isLoading ? (
               <div className="flex justify-center items-center h-[300px]">
                 <ThreeDot
@@ -205,10 +192,9 @@ const Page = () => {
 
           {selected.length > 0 && (
             <footer className="fixed bottom-0 self-stretch mr-5 md:left-64 ml-5 right-0 
-                     bg-blue-50 dark:bg-gray-800/80 backdrop-blur-md shadow-lg 
-                     p-4 flex justify-between items-center rounded-t-xl 
-                     transition-all duration-300 border-t border-gray-300 dark:border-gray-600 z-20">
-              {/* Checkbox chọn tất cả */}
+                      bg-blue-50 dark:bg-gray-800/80 backdrop-blur-md shadow-lg 
+                      p-4 flex justify-between items-center rounded-t-xl 
+                      transition-all duration-300 border-t border-gray-300 dark:border-gray-600 z-20">
               <div className="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -221,14 +207,13 @@ const Page = () => {
                 </span>
               </div>
 
-              {/* Nút hành động */}
               <div className="flex items-center gap-3">
                 <button
                   onClick={handleDeleteBooks}
                   className="px-5 py-2.5 rounded-xl border border-transparent 
-                       bg-gradient-to-r from-[#F7302E] to-[#F44336] 
-                       text-white font-medium shadow-sm hover:brightness-110 
-                       hover:scale-[1.03] active:scale-95 transition-all duration-300"
+                        bg-gradient-to-r from-[#F7302E] to-[#F44336] 
+                        text-white font-medium shadow-sm hover:brightness-110 
+                        hover:scale-[1.03] active:scale-95 transition-all duration-300"
                 >
                   Xóa sách ({selected.length})
                 </button>
@@ -236,9 +221,9 @@ const Page = () => {
                 <button
                   onClick={handleBorrowBooks}
                   className="px-5 py-2.5 rounded-xl border border-transparent 
-                       bg-gradient-to-r from-[#062D76] to-[#0a3c9d]
-                       text-white font-medium shadow-sm hover:brightness-110 
-                       hover:scale-[1.03] active:scale-95 transition-all duration-300"
+                        bg-gradient-to-r from-[#062D76] to-[#0a3c9d]
+                        text-white font-medium shadow-sm hover:brightness-110 
+                        hover:scale-[1.03] active:scale-95 transition-all duration-300"
                 >
                   Đăng ký mượn ({selected.length})
                 </button>
