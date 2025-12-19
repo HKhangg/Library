@@ -24,13 +24,13 @@ function Page() {
   // State loading cho hành động Submit
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // 2. useSWR: Lấy danh sách Users
+  // useSWR: Lấy danh sách Users
   const { data: userList = [], isLoading: usersLoading } = useSWR(
     `${process.env.NEXT_PUBLIC_API_URL}/api/user`,
     fetcher
   );
 
-  // 3. useSWR: Lấy danh sách Books
+  // useSWR: Lấy danh sách Books
   const { data: bookList = [], isLoading: booksLoading } = useSWR(
     `${process.env.NEXT_PUBLIC_API_URL}/api/book`,
     fetcher
@@ -43,7 +43,7 @@ function Page() {
   };
 
   const handleEnterUser = () => {
-    // Tìm user theo ID (convert về string để so sánh an toàn)
+    // Tìm user theo ID
     const selected = userList.find((u) => u?.id?.toString() === userText.trim());
     if (!selected) {
       toast.error("Không tìm thấy người dùng với ID này");
@@ -90,7 +90,7 @@ function Page() {
       return;
     }
 
-    // Confirm action (Dùng window.confirm hoặc custom modal, ở đây dùng confirm cho đơn giản)
+    // Confirm action trước khi submit
     if (!confirm(`Tạo phiếu mượn cho ${user.username} với ${borrowList.length} cuốn sách?`)) {
       return;
     }
@@ -101,10 +101,10 @@ function Page() {
     try {
       const borrowedBooks = borrowList.map((item) => ({
         bookId: item.maSach,
-        childBookId: null, // Logic backend tự xử lý child book
+        childBookId: null, 
       }));
 
-      // Ngày trả sách là 7 ngày sau
+      // Deadline 7 ngày tính từ ngày mượn
       const dueDate = new Date();
       dueDate.setDate(dueDate.getDate() + 7);
 
@@ -135,7 +135,7 @@ function Page() {
       }
     } catch (error) {
       console.error("Lỗi khi tạo phiếu mượn:", error);
-      toast.error("Tạo phiếu thất bại. Vui lòng thử lại.", { id: toastId });
+      toast.error("Tạo phiếu thất bạVui lòng thử lại.", { id: toastId });
       setIsSubmitting(false);
     }
   };

@@ -177,12 +177,12 @@ export const NotificationProvider = ({ children }) => {
     return (
         <NotificationContext.Provider value={{
             unreadCount,
-            notifications, // Expose danh sách
-            loading,       // Expose trạng thái loading
+            notifications, 
+            loading,       
             error,
             updateUnreadCount,
             decrementUnreadCount,
-            refreshNotifications // Quan trọng: Expose hàm này để trang khác gọi
+            refreshNotifications 
         }}>
             {children}
         </NotificationContext.Provider>

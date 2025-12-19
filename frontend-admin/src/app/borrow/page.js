@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useMemo, useEffect } from "react";
-import { useRouter, useSearchParams, usePathname } from "next/navigation"; // 1. Import hooks điều hướng
+import { useRouter, useSearchParams, usePathname } from "next/navigation"; // Import hooks điều hướng
 import Sidebar from "../components/sidebar/Sidebar";
 import {
   BookCheck,
@@ -17,7 +17,6 @@ import { Input } from "../components/ui/input";
 import toast, { Toaster } from "react-hot-toast";
 import { ThreeDot } from "react-loading-indicators";
 
-// Import SWR
 import useSWR, { mutate } from "swr";
 import { fetcher } from "@/lib/fetcher";
 
@@ -26,16 +25,16 @@ const Page = () => {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  // 2. Lấy trạng thái từ URL thay vì useState (Giá trị mặc định là 'Đã yêu cầu')
+  // Lấy trạng thái từ URL thay vì useState. Default = đã yêu cầu
   const currentTab = searchParams.get("tab") || "Đã yêu cầu";
   const urlSearchQuery = searchParams.get("query") || "";
   const currentPage = Number(searchParams.get("page")) || 1;
   const itemsPerPage = 10;
 
-  // State nội bộ cho ô input search (để gõ mượt mà không reload URL liên tục)
+  // State nội bộ cho ô input search 
   const [localSearch, setLocalSearch] = useState(urlSearchQuery);
 
-  // Đồng bộ URL vào ô input khi URL thay đổi (VD: Nhấn nút Back)
+  // Đồng bộ URL vào ô input khi URL thay đổi
   useEffect(() => {
     setLocalSearch(urlSearchQuery);
   }, [urlSearchQuery]);
@@ -54,7 +53,7 @@ const Page = () => {
     }
   );
 
-  // 3. Hàm cập nhật URL (Core Logic)
+  // Hàm cập nhật URL
   const updateParams = (updates) => {
     const params = new URLSearchParams(searchParams);
 
@@ -74,7 +73,7 @@ const Page = () => {
     router.replace(`${pathname}?${params.toString()}`);
   };
 
-  // 4. Logic Lọc dữ liệu (Dựa trên currentTab từ URL)
+  // Logic Lọc dữ liệu
   const filteredCards = useMemo(() => {
     let result = allBorrowCards;
 
@@ -87,7 +86,7 @@ const Page = () => {
       result = result.filter((c) => c.status === "Đã trả" || c.status === "RETURNED");
     }
 
-    // Lọc theo Search Query (Từ URL)
+    // Lọc theo Search Query
     if (urlSearchQuery.trim()) {
       const lowerQuery = urlSearchQuery.toLowerCase();
       result = result.filter(
@@ -107,7 +106,7 @@ const Page = () => {
     currentPage * itemsPerPage
   );
 
-  // --- Handlers ---
+  // Handlers
   const handlePageChange = (page) => {
     if (page >= 1 && page <= totalPages) {
       updateParams({ page: page });
@@ -123,14 +122,14 @@ const Page = () => {
   };
 
   const handleDetails = (id) => {
-    router.push(`/borrow/${id}`); // Khi push, URL hiện tại được lưu vào history -> Back sẽ đúng
+    router.push(`/borrow/${id}`); 
   };
 
   const handleAddBorrow = () => {
     router.push(`/borrow/addBorrow`);
   };
 
-  // Logic xử lý nghiệp vụ (Giữ nguyên)
+  // Logic xử lý nghiệp vụ
   const handleExpired = async () => {
     if (!confirm("Bạn chắc chắn muốn tiến hành xem xét các phiếu quá hạn?")) return;
     const toastId = toast.loading("Đang xử lý...");
@@ -167,7 +166,7 @@ const Page = () => {
     if (!confirm("Gửi mail hối trả sách cho danh sách hiện tại?")) return;
     const toastId = toast.loading("Đang gửi email...");
 
-    // Gửi mail cho list Đang mượn (filteredCards lúc này đang ở tab Đang mượn)
+    // Gửi mail cho list đang mượn
     if (filteredCards.length === 0) {
       toast("Danh sách trống", { id: toastId, icon: "ℹ️" });
       return;

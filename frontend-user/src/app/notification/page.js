@@ -48,7 +48,7 @@ const NotiCard = ({ id, message, timestamp, read, onMarkAsRead }) => {
         <>
           <FaCircle className="text-red-500 mt-1 flex-shrink-0" title="Chưa đọc" size={10} />
           <div className="flex flex-col">
-            {/* QUAN TRỌNG: Hiển thị HTML từ backend */}
+            {/* Hiển thị HTML từ backend */}
             <p
               className="text-[1.125rem] font-lora font-bold text-black dark:text-gray-100"
               dangerouslySetInnerHTML={{ __html: formattedMessage }}

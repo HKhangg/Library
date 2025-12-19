@@ -10,7 +10,6 @@ import { ThreeDot } from "react-loading-indicators";
 import useSWR, { mutate } from "swr";
 import { fetcher } from "@/lib/fetcher";
 
-// Component hiển thị thông tin sách
 const BookCard = ({ book }) => {
   if (!book) return null;
   
@@ -42,7 +41,7 @@ function Page() {
   const { id } = useParams();
   const router = useRouter();
 
-  // 2. Fetch Thông tin Phiếu Phạt
+  // Fetch Thông tin Phiếu Phạt
   const {
     data: fine,
     isLoading: loadingFine,
@@ -57,8 +56,7 @@ function Page() {
     }
   );
 
-  // 3. Conditional Fetching: Chỉ fetch thông tin sách nếu lỗi là "Trả sách trễ hạn"
-  // Logic: Lấy bookId từ borrowedBooks mảng đầu tiên (giả định)
+  // Conditional Fetching: Chỉ fetch thông tin sách nếu lỗi là "Trả sách trễ hạn"
   const bookId = fine?.cardId?.borrowedBooks?.[0]?.bookId;
   const shouldFetchBook = fine?.noiDung === "Trả sách trễ hạn" && bookId;
 
@@ -77,7 +75,7 @@ function Page() {
     return date.toLocaleDateString("vi-VN");
   };
 
-  // 4. Xử lý Thanh Toán
+  // Xử lý Thanh Toán
   const handleThanhToan = async () => {
     if (!fine) return;
 

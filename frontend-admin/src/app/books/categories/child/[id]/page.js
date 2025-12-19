@@ -17,14 +17,12 @@ export default function EditCategoryChildPage() {
   const router = useRouter();
   const { id } = useParams();
 
-  // State Form
   const [name, setName] = useState("");
 
-  // State UI
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
 
-  // 2. useSWR: Lấy thông tin chi tiết danh mục con
+  // useSWR: Lấy thông tin chi tiết danh mục con
   const { data: childData, isLoading, error } = useSWR(
     id ? `${process.env.NEXT_PUBLIC_API_URL}/api/category-child/${id}` : null,
     fetcher,
@@ -37,7 +35,7 @@ export default function EditCategoryChildPage() {
     }
   );
 
-  // 3. Populate Data vào Form
+  // Populate Data vào Form
   useEffect(() => {
     if (childData) {
       setName(childData.name || "");
@@ -53,7 +51,7 @@ export default function EditCategoryChildPage() {
     return () => window.removeEventListener("popstate", handlePopState);
   }, [router]);
 
-  // HÀM CẬP NHẬT
+  // Hàm cập nhật
   const save = async () => {
     if (!name.trim()) return toast.error("Nhập tên danh mục con");
 
@@ -75,7 +73,7 @@ export default function EditCategoryChildPage() {
     }
   };
 
-  // HÀM XÓA
+  // Hàm xóa
   const deleteChild = async () => {
     const toastId = toast.loading("Đang xóa danh mục con...");
     try {

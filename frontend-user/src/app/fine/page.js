@@ -29,7 +29,7 @@ const Page = () => {
     route.push(`/fine/${fineId}`);
   };
 
-  // 2. Sử dụng useSWR để lấy danh sách phiếu phạt
+  // Sử dụng useSWR để lấy danh sách phiếu phạt
   const { data: fines = [], isLoading } = useSWR(
     user?.id ? `${process.env.NEXT_PUBLIC_API_URL}/api/fines/${user.id}` : null,
     fetcher,
@@ -39,18 +39,18 @@ const Page = () => {
     }
   );
 
-  // 3. Logic lọc dữ liệu (Sử dụng useMemo để tối ưu)
+  // Logic lọc dữ liệu (Sử dụng useMemo để tối ưu)
   const displayFines = useMemo(() => {
     if (!Array.isArray(fines)) return [];
 
-    // Bước 1: Lọc theo tab (Chưa thanh toán / Đã thanh toán)
+    // Lọc theo tab 
     let filtered = fines.filter((fine) => {
       if (mode === 0) return fine.trangThai !== "DA_THANH_TOAN";
       if (mode === 1) return fine.trangThai === "DA_THANH_TOAN";
       return true;
     });
 
-    // Bước 2: Lọc theo từ khóa tìm kiếm (nếu có)
+    // Lọc theo từ khóa tìm kiếm 
     if (searchQuery) {
       const lowerQuery = searchQuery.toLowerCase();
       filtered = filtered.filter(

@@ -18,7 +18,6 @@ export default function CategoriesPage() {
     MOST_BORROWED: "Được mượn nhiều",
   };
 
-  // SWR: Fetch categories (cache lâu vì ít thay đổi)
   const { data: categories = [], isLoading: categoriesLoading } = useSWR(
     `${process.env.NEXT_PUBLIC_API_URL}/api/category`,
     fetcher,
@@ -27,7 +26,6 @@ export default function CategoriesPage() {
     }
   );
 
-  // SWR: Fetch category children (chỉ fetch khi có activeParentId)
   const { data: categoryChildren = [], isLoading: childrenLoading } = useSWR(
     activeParentId
       ? `${process.env.NEXT_PUBLIC_API_URL}/api/category-child/category/${activeParentId}` 
@@ -38,13 +36,11 @@ export default function CategoriesPage() {
     }
   );
 
-  // Build childrenMap
   const childrenMap = useMemo(() => {
     if (!activeParentId || !categoryChildren) return {};
     return { [activeParentId]: categoryChildren };
   }, [activeParentId, categoryChildren]);
 
-  // Build dynamic book fetch URL
   const booksUrl = useMemo(() => {
     const baseUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/book`;
     if (activeChildId) {
@@ -59,13 +55,12 @@ export default function CategoriesPage() {
     }
   }, [activeParentId, activeChildId, activeFilter]);
 
-  // ✅ SWR: Fetch books (URL thay đổi khi filter/category thay đổi)
   const { data: books = [], isLoading: booksLoading } = useSWR(
     booksUrl,
     fetcher,
     {
       dedupingInterval: 30000,          // Cache 30s - ngăn duplicate request
-      keepPreviousData: true,           // Giữ data cũ khi đổi filter (tránh flash trắng)
+      keepPreviousData: true,           // Giữ data cũ khi đổi filter 
       revalidateOnFocus: false,         // Không refetch khi focus window
     }
   );

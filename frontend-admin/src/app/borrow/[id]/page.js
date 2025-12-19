@@ -98,7 +98,7 @@ const ChiTietPhieuMuon = () => {
   const router = useRouter();
   const [popUpOpen, setPopUpOpen] = useState(false);
 
-  // 2. useSWR: Lấy thông tin chi tiết phiếu mượn
+  // useSWR: Lấy thông tin chi tiết phiếu mượn
   const { data: borrowDetail, isLoading, error } = useSWR(
     id ? `${process.env.NEXT_PUBLIC_API_URL}/api/borrow-cards/${id}` : null,
     fetcher,
@@ -112,7 +112,7 @@ const ChiTietPhieuMuon = () => {
     router.back();
   };
 
-  // 3. Xử lý Xóa Phiếu Mượn (Async + Toast Loading)
+  // Xử lý Xóa Phiếu Mượn (Async + Toast Loading)
   const handleDelete = async () => {
     if (!borrowDetail) return;
 

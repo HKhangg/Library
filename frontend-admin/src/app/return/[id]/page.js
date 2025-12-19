@@ -45,7 +45,7 @@ const Page = () => {
   // State cho Modal Xóa
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
-  // 2. Fetch Data với SWR
+  // Fetch Data với SWR
   const {
     data: borrowDetail,
     isLoading,
@@ -126,7 +126,7 @@ const Page = () => {
     );
   }
 
-  // Tính tổng sách (Dựa trên mảng bookIds trả về từ API)
+  // Tính tổng sách
   const bookList = borrowDetail.bookIds || [];
   const totalBooks = bookList.length;
 

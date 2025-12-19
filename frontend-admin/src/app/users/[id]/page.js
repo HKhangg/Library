@@ -14,8 +14,6 @@ import { ThreeDot } from "react-loading-indicators";
 import useSWR, { mutate } from "swr";
 import { fetcher } from "@/lib/fetcher";
 
-// SUB-COMPONENTS
-
 const BackButton = () => {
   const router = useRouter();
   return (
@@ -48,13 +46,11 @@ const DatePickerField = ({ value, onChange }) => {
   const [startDate, setStartDate] = useState(null);
 
   useEffect(() => {
-    // Parse DD/MM/YYYY or YYYY-MM-DD to Date object
     if (value) {
       const date = new Date(value);
       if (!isNaN(date.getTime())) {
         setStartDate(date);
       } else {
-        // Try parsing DD/MM/YYYY manually if ISO fail
         const parts = value.split("/");
         if (parts.length === 3) setStartDate(new Date(`${parts[2]}-${parts[1]}-${parts[0]}`));
       }
@@ -63,7 +59,6 @@ const DatePickerField = ({ value, onChange }) => {
 
   const handleDateChange = (date) => {
     setStartDate(date);
-    // Format YYYY-MM-DD for backend consistency
     if (date) {
       const offsetDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
       onChange(offsetDate.toISOString().split('T')[0]);
@@ -169,7 +164,7 @@ const SelectBox = ({ label, value, options, onChange, placeholder }) => {
   );
 };
 
-// MAIN PAGE
+// Trang chính
 
 export default function EditUserPage() {
   const { id } = useParams();
@@ -248,7 +243,6 @@ export default function EditUserPage() {
 
       toast.success("Cập nhật thành công!", { id: toastId });
 
-      // Refresh cache
       mutate(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/users`);
 
       setTimeout(() => router.push("/users"), 1000);

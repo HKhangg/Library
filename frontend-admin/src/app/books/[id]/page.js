@@ -52,8 +52,7 @@ function Page() {
     }
   );
 
-  // 3. useSWR: Lấy chi tiết Sách
-  // Key là null nếu chưa có ID
+  // useSWR: Lấy chi tiết Sách
   const { data: bookData, isLoading: loadingBook, mutate: mutateBook } = useSWR(
     id ? `${process.env.NEXT_PUBLIC_API_URL}/api/book/${id}` : null,
     fetcher,
@@ -62,7 +61,7 @@ function Page() {
     }
   );
 
-  // 4. Populate Data vào Form (Chạy khi bookData tải xong)
+  // Populate Data vào Form 
   useEffect(() => {
     if (bookData) {
       setStatus(bookData.trangThai || "");
@@ -154,7 +153,7 @@ function Page() {
       return;
     }
 
-    // Xử lý logic KHÔI PHỤC SÁCH (Nếu đã xóa)
+    // Xử lý logic khôi phục sách nếu đã xóa
     if (isDeleted) {
       const newQ = +quantity;
       if (isNaN(newQ) || newQ <= 0) {
@@ -195,10 +194,6 @@ function Page() {
     if (+weight !== bookData.trongLuong) bookUpdates.trongLuong = +weight;
     if (+price !== bookData.donGia) bookUpdates.donGia = +price;
 
-    // Logic cập nhật số lượng (Cộng thêm)
-    // Backend API logic: 'tongSoLuong' gửi lên sẽ được coi là số lượng CẦN THÊM VÀO
-    // Nếu bạn muốn giữ nguyên số lượng cũ, gửi 0 hoặc không gửi (tùy API của bạn)
-    // Theo logic code cũ: gửi 'tongSoLuong' = addQty
     bookUpdates.tongSoLuong = addQty;
 
     // Logic cập nhật Category
@@ -222,8 +217,6 @@ function Page() {
       // Upload ảnh nếu có
       let newImgs = await uploadImagesToCloudinary();
       if (Array.isArray(newImgs) && newImgs.length > 0) {
-        // Cần merge với ảnh cũ hoặc thay thế tùy logic (Code cũ thay thế bằng newImgs trả về)
-        // Nếu API upload trả về full list ảnh mới thì gán luôn
         bookUpdates.hinhAnh = newImgs;
       }
 
@@ -234,8 +227,6 @@ function Page() {
       mutateBook();
 
       toast.success("Cập nhật sách thành công", { id: toastId });
-      // setTimeout(() => router.push(`/books/details/${id}`), 1000); 
-      // Không cần redirect nếu muốn ở lại trang edit, hoặc redirect tùy ý
 
     } catch (err) {
       console.error("Lỗi:", err);

@@ -10,7 +10,6 @@ import { ThreeDot } from "react-loading-indicators";
 import { Trash2, AlertTriangle } from "lucide-react";
 import useSWR, { mutate } from "swr";
 
-// Fetcher đơn giản cho GET request
 const fetcher = (url) => axios.get(url).then((res) => res.data);
 
 const BookCard = ({
@@ -110,13 +109,11 @@ const ChiTietPhieuMuon = () => {
   const [popUpOpen, setPopUpOpen] = useState(false);
   const [user, setUser] = useState(null);
 
-  // Lấy user để dùng cho việc mutate
   useEffect(() => {
     const storedUser = JSON.parse(localStorage.getItem("persist:root"));
     setUser(storedUser);
   }, []);
 
-  // 2. Sử dụng useSWR để lấy chi tiết
   const {
     data: borrowDetail,
     isLoading: loading,
@@ -140,7 +137,6 @@ const ChiTietPhieuMuon = () => {
       toast.success("Xóa phiếu thành công", { id: toastId });
       setPopUpOpen(false);
 
-      // 3. Làm mới dữ liệu ở trang danh sách
       if (user?.id) {
         mutate(
           `${process.env.NEXT_PUBLIC_API_URL}/api/borrow-cards/user/${user.id}`

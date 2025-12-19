@@ -42,7 +42,7 @@ function Page() {
   const [isCateListOpen, setIsCateListOpen] = useState(false);
   const [isCateList2Open, setIsCateList2Open] = useState(false);
 
-  // 2. useSWR: Lấy danh sách danh mục (Thay thế useEffect cũ)
+  // useSWR: Lấy danh sách danh mục (Thay thế useEffect cũ)
   const { data: totalCate = [], isLoading: loadingCategories } = useSWR(
     `${process.env.NEXT_PUBLIC_API_URL}/api/category`,
     fetcher,
@@ -52,10 +52,10 @@ function Page() {
     }
   );
 
-  // 3. Derived State: Tạo danh sách tên thể loại chính
+  // Derived State: Tạo danh sách tên thể loại chính
   const cateList = useMemo(() => totalCate.map((item) => item.name), [totalCate]);
 
-  // 4. Derived State: Tự động lọc danh sách thể loại phụ (Thay thế useEffect cũ)
+  // Derived State: Tự động lọc danh sách thể loại phụ 
   const cate2List = useMemo(() => {
     if (!category) return [];
     const selectedCate = totalCate.find((cate) => cate.name === category);
@@ -129,14 +129,14 @@ function Page() {
     const toastId = toast.loading("Đang xử lý dữ liệu...");
 
     try {
-      // 1. Upload ảnh
+      // Upload ảnh
       let finalImageURLs = [];
       if (image.some((img) => img.selectedFile)) {
         const newImages = await uploadImagesToCloudinary();
         finalImageURLs = newImages;
       }
 
-      // 2. Tìm ID danh mục
+      // Tìm ID danh mục
       const selectedParent = totalCate.find((cate) => cate.name === category);
       if (!selectedParent) throw new Error("Thể loại chính không hợp lệ");
 
@@ -163,7 +163,7 @@ function Page() {
         quantity: parseInt(quantity),
       };
 
-      // 3. Gọi API tạo sách
+      // Gọi API tạo sách
       const res = await axios.post(
         `${process.env.NEXT_PUBLIC_API_URL}/api/book`,
         bookData

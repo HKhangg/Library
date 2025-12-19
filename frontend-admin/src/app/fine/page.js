@@ -16,7 +16,7 @@ const Page = () => {
   const searchParams = useSearchParams();
   const pathname = usePathname();
 
-  // 1. Lấy trạng thái từ URL
+  // Lấy trạng thái từ URL
   const currentMode = searchParams.get("mode") || "0";
   const searchQuery = searchParams.get("query") || "";
   const currentPage = Number(searchParams.get("page")) || 1;
@@ -29,7 +29,7 @@ const Page = () => {
     setLocalSearch(searchQuery);
   }, [searchQuery]);
 
-  // 2. Fetch Data
+  // Fetch Data
   const {
     data: allFines = [],
     isLoading
@@ -46,7 +46,7 @@ const Page = () => {
     }
   );
 
-  // 3. Helper cập nhật URL
+  // Helper cập nhật URL
   const updateParams = (updates) => {
     const params = new URLSearchParams(searchParams);
     Object.entries(updates).forEach(([key, value]) => {
@@ -65,11 +65,11 @@ const Page = () => {
     router.replace(`${pathname}?${params.toString()}`);
   };
 
-  // 4. Logic Lọc dữ liệu (Client-side)
+  // Logic Lọc dữ liệu
   const filteredFines = useMemo(() => {
     let result = allFines;
 
-    // Lọc theo Mode (Trạng thái)
+    // Lọc theo mode trạng thái
     if (currentMode === "0") {
       result = result.filter((f) => f.trangThai === "CHUA_THANH_TOAN");
     } else if (currentMode === "1") {
@@ -96,7 +96,7 @@ const Page = () => {
     currentPage * itemsPerPage
   );
 
-  // --- Handlers ---
+  // Handlers
   const handlePageChange = (page) => {
     if (page >= 1 && page <= totalPages) {
       updateParams({ page });

@@ -150,21 +150,18 @@ const BookDetailsPage = () => {
       }
 
     } catch (error) {
-      // --- KHỐI CATCH ĐÃ CẬP NHẬT HOÀN CHỈNH ---
       console.error("Lỗi khi tạo phiếu mượn:", error.response);
 
-      let errorMessage = "Không thể mượn sách. Vui lòng thử lại."; // 1. Lỗi dự phòng mặc định
+      let errorMessage = "Không thể mượn sách. Vui lòng thử lại."; 
 
       if (error.response) {
         const status = error.response.status;
         const errorData = error.response.data;
 
-        // 2. GIẢ ĐỊNH: Nếu là lỗi 400, ưu tiên hiển thị lỗi giới hạn mượn sách
         if (status === 400) {
           errorMessage = "Bạn đã đạt đến giới hạn mượn sách hoặc đã mượn sách này rồi.";
         }
 
-        // 3. KIỂM TRA LẠI: Nếu backend có trả về thông báo cụ thể, thì dùng nó
         if (errorData) {
           if (typeof errorData === 'string' && errorData.length > 0) {
             errorMessage = errorData;
@@ -181,7 +178,6 @@ const BookDetailsPage = () => {
         errorMessage = error.message;
       }
 
-      // 4. Hiển thị thông báo lỗi cuối cùng
       toast.error(errorMessage, { id: toastId });
     }
   };

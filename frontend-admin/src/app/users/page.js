@@ -11,7 +11,6 @@ import { ThreeDot } from "react-loading-indicators";
 
 import useSWR, { mutate } from "swr";
 
-// Fetcher
 const authFetcher = async (url) => {
   const token = localStorage.getItem("accessToken");
   const response = await axios.get(url, {
@@ -29,11 +28,11 @@ const Page = () => {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  // 1. Lấy trạng thái từ URL thay vì useState
+  // Lấy trạng thái từ URL thay vì useState
   const currentPage = Number(searchParams.get("page")) || 1;
   const urlSearchQuery = searchParams.get("query") || "";
 
-  // State cục bộ cho ô input tìm kiếm (để gõ mượt mà không reload URL liên tục)
+  // State cục bộ cho ô input tìm kiếm
   const [localSearchQuery, setLocalSearchQuery] = useState(urlSearchQuery);
 
   const [popUpOpen, setPopUpOpen] = useState(false);
@@ -45,7 +44,7 @@ const Page = () => {
     setLocalSearchQuery(urlSearchQuery);
   }, [urlSearchQuery]);
 
-  // 2. Fetch dữ liệu
+  // Fetch dữ liệu
   const {
     data: responseData,
     isLoading,
@@ -67,7 +66,7 @@ const Page = () => {
 
   const userList = responseData?.data || [];
 
-  // 3. Logic tìm kiếm (Filter dựa trên từ khóa từ URL)
+  // Logic tìm kiếm (Filter dựa trên từ khóa từ URL)
   const filteredUsers = useMemo(() => {
     if (!urlSearchQuery.trim()) return userList;
 
@@ -81,7 +80,7 @@ const Page = () => {
     );
   }, [urlSearchQuery, userList]);
 
-  // 4. Hàm cập nhật URL
+  // Hàm cập nhật URL
   const updateURL = (key, value) => {
     const params = new URLSearchParams(searchParams);
     if (value) {
@@ -110,7 +109,6 @@ const Page = () => {
     updateURL("page", pageNumber);
   };
 
-  // --- Các hàm xử lý logic khác giữ nguyên ---
   const handleDelete = async (user) => {
     const token = localStorage.getItem("accessToken");
     if (!token) {
@@ -172,7 +170,7 @@ const Page = () => {
   };
 
   const handleEdit = (userId) => {
-    // URL hiện tại (có page, query) sẽ được lưu trong history của trình duyệt
+    // URL hiện tại được lưu trong trình duyệt
     router.push(`/users/${userId}`);
   };
 

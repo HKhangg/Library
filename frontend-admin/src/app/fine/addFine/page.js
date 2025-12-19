@@ -14,35 +14,32 @@ import { fetcher } from "@/lib/fetcher";
 function AddFine() {
   const router = useRouter();
 
-  const [user, setUser] = useState(null); // User object
-  const [userText, setUserText] = useState(""); // Input ID User
+  const [user, setUser] = useState(null); 
+  const [userText, setUserText] = useState(""); 
   const [money, setMoney] = useState(0);
-  const [reason, setReason] = useState(""); // Lý do phạt
-  const [more, setMore] = useState(""); // Nội dung 'Khác'
+  const [reason, setReason] = useState(""); 
+  const [more, setMore] = useState(""); 
 
   // State liên quan đến lý do phạt
-  const [borrow, setBorrow] = useState(null); // Phiếu mượn được chọn (cho lỗi Trả muộn)
-  const [book, setBook] = useState(null); // Sách được chọn (cho lỗi Mất sách)
-  const [bookText, setBookText] = useState(""); // Input ID Sách
+  const [borrow, setBorrow] = useState(null); 
+  const [book, setBook] = useState(null); 
+  const [bookText, setBookText] = useState(""); 
 
   // UI State
   const [isBorrowDropDownOpen, setBorrowDropDownOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // 2. useSWR: Lấy danh sách Users (Fetch 1 lần)
+  // useSWR: Lấy danh sách Users
   const { data: userList = [] } = useSWR(
     `${process.env.NEXT_PUBLIC_API_URL}/api/user`,
     fetcher
   );
 
-  // 3. useSWR: Lấy danh sách Phiếu mượn của User (Chỉ fetch khi đã chọn User)
+  // useSWR: Lấy danh sách Phiếu mượn của User 
   const { data: borrowList = [] } = useSWR(
     user ? `${process.env.NEXT_PUBLIC_API_URL}/api/borrow-cards/user/${user.id}` : null,
-    // Lưu ý: API này code cũ dùng method POST, nhưng fetcher mặc định GET. 
-    // Nếu API backend bắt buộc POST, ta cần custom fetcher. 
-    // Giả sử ở đây ta sửa lại dùng fetcher GET hoặc custom fetcher:
     async (url) => {
-      const res = await fetch(url, { method: "POST" }); // Giữ method POST như code cũ
+      const res = await fetch(url, { method: "POST" });
       if (res.status === 204) return [];
       return res.json();
     }

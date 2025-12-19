@@ -22,11 +22,8 @@ const Page = () => {
     setUser(storedUser);
   }, []);
 
-  // 2. Fetcher riêng cho API POST này
   const postFetcher = (url) => axios.post(url).then((res) => res.data);
 
-  // 3. Sử dụng useSWR
-  // Key là null nếu chưa có user.id (để ngăn fetch sớm)
   const {
     data: allBorrowCards = [],
     isLoading,

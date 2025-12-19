@@ -30,12 +30,12 @@ export default function EditCategoryPage() {
   const [showAddChildModal, setShowAddChildModal] = useState(false);
   const [newChildName, setNewChildName] = useState("");
 
-  // 2. useSWR: Lấy thông tin chi tiết danh mục
+  // useSWR: Lấy thông tin chi tiết danh mục
   const {
     data: categoryData,
     isLoading,
     error,
-    mutate: mutateCategory // Fetch lại dữ liệu khi cần
+    mutate: mutateCategory 
   } = useSWR(
     id ? `${process.env.NEXT_PUBLIC_API_URL}/api/category/${id}` : null,
     fetcher,
@@ -48,7 +48,7 @@ export default function EditCategoryPage() {
     }
   );
 
-  // 3. Populate Data: Khi có data từ SWR thì đổ vào form state
+  // Populate Data: Khi có data từ SWR thì đổ vào form state
   useEffect(() => {
     if (categoryData) {
       setData({
@@ -72,7 +72,7 @@ export default function EditCategoryPage() {
     setData({ ...data, [e.target.name]: e.target.value });
   };
 
-  // HÀM THÊM DANH MỤC CON
+  // Hàm thêm danh mục con
   const addChild = async () => {
     if (!newChildName.trim()) {
       toast.error("Vui lòng nhập tên danh mục con");
@@ -98,7 +98,7 @@ export default function EditCategoryPage() {
     }
   };
 
-  // HÀM CẬP NHẬT TÊN DANH MỤC CHA
+  // Hàm cập nhật danh mục cha
   const save = async () => {
     if (!data.name.trim()) {
       toast.error("Vui lòng nhập tên danh mục cha");
@@ -112,7 +112,7 @@ export default function EditCategoryPage() {
         { name: data.name }
       );
 
-      // Update cache SWR (cho cả danh sách bên ngoài nếu cần, nhưng quan trọng là trang này)
+      // Update cache SWR 
       mutateCategory();
 
       toast.success("Cập nhật danh mục thành công", { id: toastId });
@@ -123,7 +123,7 @@ export default function EditCategoryPage() {
     }
   };
 
-  // HÀM XÓA DANH MỤC CHA
+  // Hàm xóa danh mục cha
   const deleteParent = async () => {
     const toastId = toast.loading("Đang xóa danh mục...");
     try {
@@ -153,7 +153,7 @@ export default function EditCategoryPage() {
     }
   };
 
-  // HÀM XÓA DANH MỤC CON
+  // Hàm xóa danh mục con
   const deleteChild = async (childId) => {
     const toastId = toast.loading("Đang xóa danh mục con...");
     try {

@@ -36,13 +36,12 @@ ChartJS.register(
 );
 
 const Dashboard = () => {
-  // State UI & Pagination
+  // UI và phân trang
   const [activeSection, setActiveSection] = useState("danhSach");
   const [currentPage, setCurrentPage] = useState(1);
   const booksPerPage = 10;
   const router = useRouter();
 
-  // State Search Params
   const [searchParams, setSearchParams] = useState({
     author: "",
     category: "",
@@ -53,13 +52,13 @@ const Dashboard = () => {
     sortByBorrowCount: false,
   });
 
-  // State URL cho SWR (Điều khiển việc fetch sách)
+  // State URL cho SWR 
   // Mặc định load tất cả sách
   const [bookApiUrl, setBookApiUrl] = useState(
     `${process.env.NEXT_PUBLIC_API_URL}/api/book`
   );
 
-  // 1. SWR: Lấy Thống kê Dashboard
+  // SWR: Lấy Thống kê Dashboard
   const { data: dashboardData, isLoading: dashboardLoading } = useSWR(
     `${process.env.NEXT_PUBLIC_API_URL}/api/book/dashboard`,
     fetcher,
@@ -69,17 +68,17 @@ const Dashboard = () => {
     }
   );
 
-  // 2. SWR: Lấy Danh sách Sách (URL động)
+  // SWR: Lấy Danh sách Sách 
   const { data: booksData = [], isLoading: booksLoading } = useSWR(
     bookApiUrl,
     fetcher,
     {
-      keepPreviousData: true, // Giữ data cũ khi đang search mới (tránh nhấp nháy)
+      keepPreviousData: true, // Giữ data cũ khi đang search mới
       revalidateOnFocus: false,
     }
   );
 
-  // 3. Xử lý dữ liệu Biểu đồ (Derived State)
+  // Xử lý dữ liệu biểu đồ
   const { barChartData, lineChartData } = useMemo(() => {
     if (!dashboardData) {
       return {
@@ -171,8 +170,6 @@ const Dashboard = () => {
     return { barChartData: barData, lineChartData: lineData };
   }, [dashboardData]);
 
-  // 4. Xử lý Phân trang & UI Data
-  // Đảm bảo booksData luôn là mảng trước khi slice
   const safeBooks = Array.isArray(booksData) ? booksData : [];
   const totalPages = Math.ceil(safeBooks.length / booksPerPage) || 1;
   const paginatedBooks = safeBooks.slice(
@@ -182,7 +179,7 @@ const Dashboard = () => {
 
   const booksToRestock = dashboardData?.booksToRestock || [];
 
-  // 5. Handlers
+  // Handlers
   const handleSearchChange = (e) => {
     const { name, value, type, checked } = e.target;
     setSearchParams((prev) => ({

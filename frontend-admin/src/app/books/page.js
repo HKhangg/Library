@@ -14,7 +14,7 @@ import useSWR, { mutate } from "swr";
 import { fetcher } from "@/lib/fetcher";
 
 const Page = () => {
-  // State tìm kiếm & Lọc
+  // State tìm kiếm và lọc
   const [searchQuery, setSearchQuery] = useState("");
   const [mode, setMode] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -26,18 +26,18 @@ const Page = () => {
   const [itemsPerPage] = useState(10);
   const router = useRouter();
 
-  // 2. State URL cho SWR (Quản lý việc fetch dữ liệu)
+  // State URL cho SWR
   // Mặc định load tất cả sách
   const [apiUrl, setApiUrl] = useState(`${process.env.NEXT_PUBLIC_API_URL}/api/book`);
 
-  // 3. useSWR: Fetch dữ liệu sách
+  // useSWR: Fetch dữ liệu sách
   const { data: booksData = [], isLoading, error } = useSWR(
     apiUrl,
     fetcher,
     {
       revalidateOnFocus: false,
       dedupingInterval: 60000, // Cache 1 phút
-      keepPreviousData: true, // Giữ dữ liệu cũ khi đang tìm kiếm mới
+      keepPreviousData: true, 
       onError: () => toast.error("Không thể tải danh sách sách"),
     }
   );
@@ -45,7 +45,7 @@ const Page = () => {
   // Đảm bảo dữ liệu luôn là mảng
   const safeBookList = Array.isArray(booksData) ? booksData : [];
 
-  // 4. Xử lý Search (Cập nhật URL cho SWR)
+  // Xử lý Search
   const handleSearch = (e) => {
     e?.preventDefault();
     setCurrentPage(1); // Reset về trang 1
@@ -82,12 +82,12 @@ const Page = () => {
     setApiUrl(`${process.env.NEXT_PUBLIC_API_URL}/api/book/search?${queryString}`);
   };
 
-  // 5. Xử lý Xóa (Giữ logic check sách con + Thêm Toast Loading + Mutate)
+  // Xử lý xóa -> giữ logic check sách con + thêm toast loading + mutate)
   const handleDelete = async (book) => {
     const toastId = toast.loading("Đang kiểm tra và xóa sách...");
 
     try {
-      // Bước 1: Kiểm tra sách con (Logic cũ của bạn)
+      // Kiểm tra sách con 
       const { data } = await axios.get(
         `${process.env.NEXT_PUBLIC_API_URL}/api/book/${book.maSach}`
       );
@@ -99,17 +99,16 @@ const Page = () => {
         return;
       }
 
-      // Bước 2: Xóa sách
+      // Xóa sách
       await axios.delete(
         `${process.env.NEXT_PUBLIC_API_URL}/api/book/${book.maSach}`
       );
 
-      // Bước 3: Cập nhật SWR (Optimistic UI Update hoặc Refetch)
-      // Cách này lọc bỏ item ngay lập tức trên giao diện
+      // Cập nhật SWR (Optimistic UI Update hoặc Refetch)
       mutate(
         apiUrl,
         (currentData) => currentData.filter((b) => b.maSach !== book.maSach),
-        false // false = không fetch lại ngay (tin tưởng client filter)
+        false // false = không fetch lại ngay
       );
 
       toast.success("Xóa sách thành công", { id: toastId });
@@ -128,8 +127,8 @@ const Page = () => {
     }
   };
 
-  // 6. Xử lý Lọc Client-side (Trạng thái) & Phân trang
-  // Lọc theo status (Dropdown)
+  // Xử lý phân trang 
+  // Lọc theo dropdown trạng thái
   const filteredByStatus = useMemo(() => {
     if (statusFilter === "all") return safeBookList;
     return safeBookList.filter((b) => b.trangThai === statusFilter);
@@ -147,7 +146,7 @@ const Page = () => {
     }
   };
 
-  // 7. Component UI Cards (Giữ nguyên)
+  // Component UI Cards
   const BookCard = ({ book }) => {
     return (
       <div className="flex bg-white w-full rounded-lg mt-2 p-5 gap-5 md:gap-10 drop-shadow-lg items-center">

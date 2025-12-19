@@ -16,13 +16,13 @@ const Page = () => {
   const { id } = useParams();
   const [searchQuery, setSearchQuery] = useState("");
 
-  // 2. useSWR: Lấy thông tin Sách cha
+  // useSWR: Lấy thông tin Sách cha
   const { data: book, isLoading: bookLoading } = useSWR(
     id ? `${process.env.NEXT_PUBLIC_API_URL}/api/book/${id}` : null,
     fetcher
   );
 
-  // 3. useSWR: Lấy danh sách Sách con
+  // useSWR: Lấy danh sách Sách con
   const childBooksApiUrl = id
     ? `${process.env.NEXT_PUBLIC_API_URL}/api/bookchild/book/${id}`
     : null;
@@ -38,7 +38,7 @@ const Page = () => {
   // Loading tổng
   const loading = bookLoading || childrenLoading;
 
-  // 4. Xử lý Thêm Sách con
+  // Xử lý Thêm Sách con
   const handleAddChild = async () => {
     const toastId = toast.loading("Đang tạo sách con...");
     try {
@@ -56,7 +56,7 @@ const Page = () => {
     }
   };
 
-  // 5. Xử lý Xóa Sách con
+  // Xử lý Xóa Sách con
   const handleDeleteChild = async (childId) => {
     const toastId = toast.loading("Đang xóa sách con...");
     try {
@@ -74,7 +74,7 @@ const Page = () => {
     }
   };
 
-  // 6. Logic Lọc & Thống kê (Client-side)
+  // Logic Lọc & Thống kê 
   const { filteredBooks, borrowedCount, availableCount } = useMemo(() => {
     const safeList = Array.isArray(childBookList) ? childBookList : [];
 
@@ -88,8 +88,6 @@ const Page = () => {
 
     // Thống kê
     const borrowed = safeList.filter((cb) => cb.status === "BORROWED").length;
-    // Tính toán lại available dựa trên tổng số thực tế trừ đi số đang mượn
-    // Hoặc lấy từ book.soLuongCon nếu API book chính xác
     const available = book ? book.tongSoLuong - borrowed : 0;
 
     return {

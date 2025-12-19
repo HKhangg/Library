@@ -13,7 +13,6 @@ import BookRecommend from "../components/BookRecomend";
 import { fetcher } from "@/lib/fetcher";
 import axios from "axios";
 
-// Import CSS cho Slider
 import "slick-carousel/slick/slick.css";
 import "slick-carousel/slick/slick-theme.css";
 
@@ -178,18 +177,12 @@ const HomePage = () => {
         ) : (
           <section className="flex-1 max-w-[1400px] mx-auto px-4 mb-4 mt-8 items-center z-10">
 
-            {/* --- LAYOUT CHÍNH --- */}
             <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6 lg:h-[510px]">
 
-              {/* CỘT TRÁI: SLIDER */}
               <div className="w-full h-[510px] overflow-hidden rounded-2xl bg-gray-100 dark:bg-gray-800 min-w-0 relative shadow-sm">
                 <Slider {...sliderSettings} className="h-full custom-slick-slider">
 
-                  {/* Slide 1: Service Hours Card - SỬ DỤNG !IMPORTANT ĐỂ FORCE LAYOUT */}
                   <div className="h-[510px] w-full relative">
-                    {/* Thêm dấu chấm than (!) vào các class width/height/max-w
-                        để ghi đè (override) mọi style bên trong ServiceHoursCard
-                     */}
                     <div className="w-full h-full flex [&>div]:!w-full [&>div]:!h-full [&>div]:!max-w-none [&>div]:!mx-0 [&>div]:!rounded-2xl">
                       <ServiceHoursCard />
                     </div>
@@ -203,7 +196,6 @@ const HomePage = () => {
                 </Slider>
               </div>
 
-              {/* CỘT PHẢI: LIST SÁCH RANDOM */}
               <div
                 className={`flex flex-col justify-between h-[510px] transition-all duration-500 ease-in-out ${isSidebarVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'
                   }`}

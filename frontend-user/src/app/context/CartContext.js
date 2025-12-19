@@ -2,10 +2,10 @@
 
 import React, { createContext, useState, useContext, useEffect } from "react";
 
-// 1. Tạo Context
+// Tạo Context
 const CartContext = createContext(null);
 
-// 2. Tạo Provider (Component "bọc" ứng dụng)
+// Tạo Provider (Component "bọc" ứng dụng)
 export const CartProvider = ({ children }) => {
     const [cartCount, setCartCount] = useState(0);
     const [user, setUser] = useState(null);
@@ -46,9 +46,8 @@ export const CartProvider = ({ children }) => {
     // Tự động fetch khi user thay đổi
     useEffect(() => {
         fetchCart();
-    }, [user]); // Phụ thuộc vào 'user' state
+    }, [user]); 
 
-    // Cung cấp 'cartCount' và hàm 'fetchCart' cho các component con
     return (
         <CartContext.Provider value={{ cartCount, fetchCart }}>
             {children}
@@ -56,7 +55,7 @@ export const CartProvider = ({ children }) => {
     );
 };
 
-// 3. Tạo một Hook tùy chỉnh (để dễ sử dụng)
+// Tạo một Hook tùy chỉnh 
 export const useCart = () => {
     const context = useContext(CartContext);
     if (!context) {

@@ -83,7 +83,7 @@ export default function AddCategoryPage() {
     };
 
     setLoading(true);
-    // 2. Bắt đầu Toast Loading
+    // Bắt đầu Toast Loading
     const toastId = toast.loading("Đang tạo danh mục...");
 
     try {
@@ -92,13 +92,11 @@ export default function AddCategoryPage() {
         payload
       );
 
-      // 3. SWR Mutate: Làm mới cache của trang danh sách danh mục
-      // Để khi redirect về, danh sách sẽ tự động cập nhật
+      // SWR Mutate: Làm mới cache của trang danh sách danh mục
       mutate(`${process.env.NEXT_PUBLIC_API_URL}/api/category`);
 
       toast.success("Thêm danh mục thành công", { id: toastId });
 
-      // Chờ xíu cho đẹp rồi chuyển trang
       setTimeout(() => {
         router.replace("/books/categories");
       }, 500);
@@ -112,7 +110,7 @@ export default function AddCategoryPage() {
       const errorMessage =
         error.response?.data?.message || "Thêm danh mục thất bại";
       toast.error(errorMessage, { id: toastId });
-      setLoading(false); // Chỉ tắt loading khi lỗi, thành công thì để loading cho đến khi chuyển trang
+      setLoading(false); 
     }
   };
 

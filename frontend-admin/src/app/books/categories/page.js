@@ -6,14 +6,11 @@ import { Button } from "@/app/components/ui/button";
 import { ChevronDown, PlusCircle, Undo2 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 
-// 1. Import useSWR
 import useSWR from "swr";
-import { fetcher } from "@/lib/fetcher"; // Đảm bảo đúng đường dẫn
-
+import { fetcher } from "@/lib/fetcher"; 
 export default function CategoryPage() {
   const router = useRouter();
 
-  // 2. Sử dụng useSWR để lấy danh sách danh mục
   const {
     data: categories = [],
     isLoading,
@@ -22,7 +19,7 @@ export default function CategoryPage() {
     `${process.env.NEXT_PUBLIC_API_URL}/api/category`,
     fetcher,
     {
-      revalidateOnFocus: false, // Danh mục ít thay đổi, không cần fetch liên tục
+      revalidateOnFocus: false, 
       dedupingInterval: 60000, // Cache 1 phút
       onError: () => toast.error("Không thể tải danh mục"),
     }

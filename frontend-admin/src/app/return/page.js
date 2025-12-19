@@ -15,7 +15,7 @@ const Page = () => {
   const searchParams = useSearchParams();
   const pathname = usePathname();
 
-  // 1. Lấy trạng thái từ URL
+  // Lấy trạng thái từ URL
   const searchQuery = searchParams.get("query") || "";
   const currentPage = Number(searchParams.get("page")) || 1;
   const itemsPerPage = 10;
@@ -26,7 +26,7 @@ const Page = () => {
     setLocalSearch(searchQuery);
   }, [searchQuery]);
 
-  // 2. Fetch Data
+  // Fetch Data
   const { data: allBorrowCards = [], isLoading } = useSWR(
     `${process.env.NEXT_PUBLIC_API_URL}/api/borrow-cards`,
     fetcher,
@@ -40,7 +40,7 @@ const Page = () => {
     }
   );
 
-  // 3. Helper cập nhật URL
+  // Helper cập nhật URL
   const updateURL = (key, value) => {
     const params = new URLSearchParams(searchParams);
     if (value) params.set(key, value);
@@ -51,7 +51,7 @@ const Page = () => {
     router.replace(`${pathname}?${params.toString()}`);
   };
 
-  // 4. Logic Lọc
+  // Logic Lọc
   const filteredCards = useMemo(() => {
     let result = allBorrowCards.filter(
       (c) => c.status === "Đã trả" || c.status === "RETURNED"
@@ -76,12 +76,12 @@ const Page = () => {
 
   // Handlers
   const handleDetail = (id) => {
-    // Khi push sang trang chi tiết, URL hiện tại (có query params) được lưu trong history
+    // Khi push sang trang chi tiết, URL hiện tại được lưu trong history
     router.push(`/return/${id}`);
   };
 
   const handleBorrow = () => {
-    router.push(`/borrow`); // Về trang borrow (mặc định tab 'Đã yêu cầu' hoặc giữ nguyên nếu code bên borrow xử lý)
+    router.push(`/borrow`); 
   };
 
   const handlePageChange = (page) => {
