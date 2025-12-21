@@ -1,14 +1,16 @@
 package com.library_web.library.chat.tool;
 
-import com.library_web.library.model.Book; // 
-import com.library_web.library.model.CategoryChild; // 
-import com.library_web.library.repository.CategoryChildRepository; // 
-import com.library_web.library.service.BookService; // Dùng BookServiceImpl 
+import com.library_web.library.model.Book;
+import com.library_web.library.model.CategoryChild;
+import com.library_web.library.repository.CategoryChildRepository;
+import com.library_web.library.service.BookService;
 import dev.langchain4j.agent.tool.Tool;
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.rag.content.Content;
 import dev.langchain4j.rag.content.retriever.ContentRetriever;
 import dev.langchain4j.rag.query.Query;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
@@ -23,17 +25,13 @@ import java.util.stream.Collectors;
 @Component
 public class CategoryTool2 {
 
-    @Autowired
-    private BookService bookService; 
+    private static final Logger logger = LoggerFactory.getLogger(CategoryTool2.class);
 
-    @Autowired
-    @Qualifier("categoryRetriever2") 
-    private ContentRetriever categoryRetriever;
+    @Autowired private BookService bookService;
+    @Autowired @Qualifier("categoryRetriever2") private ContentRetriever categoryRetriever;
+    @Autowired private CategoryChildRepository categoryChildRepository;
 
-    @Autowired
-    private CategoryChildRepository categoryChildRepository; 
-
-    @Tool("PHIÊN BẢN 2 (Dùng RAG từ CSV): Dùng tool này khi người dùng muốn LẤY DANH SÁCH SÁCH thuộc một THỂ LOẠI CỤ THỂ hoặc CHỦ ĐỀ (ví dụ: 'tìm sách văn học', 'sách chữa lành', 'sách cho người thất tình'). Input là tên thể loại hoặc chủ đề.")
+    @Tool("PHIÊN BẢN 3 (Hybrid Search): Tìm sách theo thể loại. Ưu tiên tìm chính xác tên trước, nếu không thấy mới dùng AI suy luận.")
     public String findBooksByCategoryNameV2(String categoryNameOrTopic) {
 
         if (categoryNameOrTopic == null || categoryNameOrTopic.trim().isEmpty()) {
@@ -41,102 +39,88 @@ public class CategoryTool2 {
         }
 
         String searchTerm = categoryNameOrTopic.trim();
+        List<Book> booksInCategory = new ArrayList<>();
+        Set<String> foundCategoryNames = new HashSet<>();
 
         try {
-          
-            Query categoryQuery = Query.from(searchTerm);
-            List<Content> retrievedContents = categoryRetriever.retrieve(categoryQuery);
-
-            if (retrievedContents.isEmpty()) {
-                return "Xin lỗi, tui không tìm thấy thể loại nào giống hoặc tương đồng với '" + searchTerm + "' trong thư viện.";
-            }
-
-            List<TextSegment> relevantSegments = retrievedContents.stream()
-                .map(Content::textSegment)
-                .filter(Objects::nonNull)
-                .distinct()
-                .toList();
-
-            Set<String> childIdsToSearch = new HashSet<>();
-            List<String> foundCategoryNames = new ArrayList<>();
-
-            for (TextSegment segment : relevantSegments) {
-                 String type = segment.metadata().getString("type");
-                 String name = segment.metadata().getString("name");
-                 String id = segment.metadata().getString("id"); 
-
-                 if (name != null && !foundCategoryNames.contains(name)) {
-                      foundCategoryNames.add(name);
-                 }
-
-                 if ("parent".equals(type)) {
-                      try {
-
-                           Long parentId = Long.parseLong(id); 
-                           List<String> childrenOfParent = categoryChildRepository.findByParentId(parentId).stream()
-                                                            .map(CategoryChild::getId) 
-                                                            .toList();
-                           if (!childrenOfParent.isEmpty()) {
-                                childIdsToSearch.addAll(childrenOfParent);
-                           } else {
-                                System.err.println("CategoryTool2: Không tìm thấy CategoryChild nào cho Parent ID: " + parentId);
-                           }
-                      } catch (Exception e) {
-                           System.err.println("CategoryTool2: Lỗi khi xử lý Parent ID '" + id + "': " + e.getMessage());
-                      }
-                 } else if ("child".equals(type)) {
-                      if (id != null && !id.isEmpty()) {
-                           childIdsToSearch.add(id); 
-                       }
-                 }
-            }
+            // BƯỚC 1: TÌM CHÍNH XÁC TRONG DB
+            List<CategoryChild> directMatches = categoryChildRepository.findByNameContainingIgnoreCase(searchTerm);
             
-            if (childIdsToSearch.isEmpty()) {
-                return "Tui tìm thấy thông tin về thể loại '" + String.join(", ", foundCategoryNames) + "' nhưng chưa liên kết được với sách nào.";
+            if (!directMatches.isEmpty()) {
+                List<String> directIds = new ArrayList<>();
+                for (CategoryChild cat : directMatches) {
+                    directIds.add(cat.getId());
+                    foundCategoryNames.add(cat.getName());
+                }
+                booksInCategory.addAll(bookService.getBooksByListCategoryChildIds(directIds));
+            } 
+            // BƯỚC 2: NẾU DB KHÔNG CÓ -> DÙNG RAG
+            else {
+                Query categoryQuery = Query.from(searchTerm);
+                List<Content> retrievedContents = categoryRetriever.retrieve(categoryQuery);
+
+                if (retrievedContents.isEmpty()) {
+                    return "Tui không tìm thấy thể loại nào giống với '" + searchTerm + "'.";
+                }
+
+                Set<String> childIdsFromRAG = new HashSet<>();
+
+                for (Content content : retrievedContents) {
+                    TextSegment segment = content.textSegment();
+                    if (segment == null) continue;
+
+                    String type = segment.metadata().getString("type");
+                    String id = segment.metadata().getString("id");
+                    String name = segment.metadata().getString("name");
+
+                    if (name != null) foundCategoryNames.add(name);
+
+                    try {
+                        if ("parent".equals(type)) {
+                            List<String> children = categoryChildRepository.findByParentId(Long.parseLong(id)) 
+                                    .stream().map(CategoryChild::getId).toList();
+                            childIdsFromRAG.addAll(children);
+                        } else if ("child".equals(type)) {
+                            childIdsFromRAG.add(id);
+                        }
+                    } catch (Exception e) {
+                        // Bỏ qua nếu lỗi parse ID
+                    }
+                }
+                
+                if (!childIdsFromRAG.isEmpty()) {
+                    booksInCategory.addAll(bookService.getBooksByListCategoryChildIds(new ArrayList<>(childIdsFromRAG)));
+                }
             }
 
-            List<Book> booksInCategory = new ArrayList<>();
-            if (!childIdsToSearch.isEmpty()) {
-                 childIdsToSearch.forEach(childId -> {
-                     try {
- 
-                          booksInCategory.addAll(bookService.getBooksByCategoryChild(childId));
-                     } catch (Exception e) {
-                          System.err.println("Lỗi khi lấy sách cho category child ID " + childId + ": " + e.getMessage());
-                     }
-                 });
-            }
+            // BƯỚC 3: XỬ LÝ KẾT QUẢ
             List<Book> finalBookList = booksInCategory.stream()
-                .filter(b -> b.getTrangThai() != Book.TrangThai.DA_XOA) // Dùng enum TrangThai từ Book.java 
+                .filter(b -> b.getTrangThai() != Book.TrangThai.DA_XOA)
                 .distinct()
                 .toList();
 
             String foundCategoryNamesStr = String.join(" hoặc ", foundCategoryNames);
 
             if (finalBookList.isEmpty()) {
-                return "Tui tìm thấy thể loại '" + foundCategoryNamesStr + "' (khớp với '" + searchTerm + "') nhưng tiếc là hiện chưa có cuốn sách nào thuộc thể loại này.";
+                if (!foundCategoryNames.isEmpty()) {
+                    return "Tui tìm thấy danh mục '" + foundCategoryNamesStr + "' nhưng tiếc là trong kho đang hết sách loại này rồi.";
+                }
+                return "Tui không tìm thấy sách nào phù hợp với '" + searchTerm + "'.";
             }
 
-            String examples = finalBookList.stream()
-                                     .limit(3)
-                                     .map(book -> "'" + book.getTenSach() + "' (ID: " + book.getMaSach() + ")") // 
-                                     .collect(Collectors.joining(", "));
-
-            if (finalBookList.size() == 1) {
-                 Book foundBook = finalBookList.get(0);
-                 return "Okela, trong các thể loại tương đồng với '" + foundCategoryNamesStr + "', tui tìm thấy đúng 1 cuốn là: '"
-                         + foundBook.getTenSach() + "' (ID sách là: " + foundBook.getMaSach() + "). Bạn muốn làm gì tiếp nè?";
-                 
-            } else {
-                 return "Okela, trong các thể loại tương đồng với '" + foundCategoryNamesStr + "', tui tìm thấy "
-                         + finalBookList.size() + " cuốn sách á! Ví dụ như: " + examples
-                         + ". Bạn muốn tui liệt kê hết tên sách hong?";
+            StringBuilder sb = new StringBuilder();
+            sb.append("Tìm thấy ").append(finalBookList.size()).append(" cuốn thuộc thể loại '")
+              .append(foundCategoryNamesStr).append("'. Dưới đây là danh sách:\n");
+            
+            for (Book b : finalBookList) {
+                sb.append("- ").append(b.getTenSach()).append(" (Mã: ").append(b.getMaSach()).append(")\n");
             }
+
+            return sb.toString();
 
         } catch (Exception e) {
-            System.err.println("Lỗi nghiêm trọng trong CategoryTool2.findBooksByCategoryNameV2 (RAG): " + e.getMessage());
-            e.printStackTrace();
-            return "Ui, hệ thống tìm kiếm thể loại đang bị lỗi chút xíu. Bạn thử lại sau giúp tui nha!";
+            logger.error("Error in CategoryTool2", e);
+            return "Hệ thống đang gặp chút trục trặc, bạn thử lại sau nha.";
         }
     }
 }

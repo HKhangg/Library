@@ -13,6 +13,7 @@ import com.library_web.library.service.CartService;
 import dev.langchain4j.agent.tool.Tool;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+// Bỏ import Transactional đi nha
 
 import java.util.ArrayList;
 import java.util.List;
@@ -27,7 +28,6 @@ public class BorrowTool {
     private UserRepository userRepository;
     @Autowired
     private CartService cartService;
-
     @Autowired 
     private BookService bookService;
 
@@ -37,6 +37,7 @@ public class BorrowTool {
                 .orElseThrow(() -> new RuntimeException("Xin lỗi, tui không tìm thấy thông tin người dùng ID " + userId));
     }
 
+    // --- SỬA 1: ĐÃ XÓA @Transactional ĐỂ KHÔNG BỊ LỖI toolExecutor is null ---
     @Tool("Dùng tool này để đăng ký mượn TẤT CẢ sách trong giỏ hàng (mỗi sách 1 phiếu mượn). Chỉ cần userId.")
     public String registerBorrowFromCart(String userId) {
         
@@ -44,7 +45,7 @@ public class BorrowTool {
         List<CartItemDTO> cartItems = cartService.getCartDetails(user);
 
         if (cartItems == null || cartItems.isEmpty()) {
-            return "Hmm, giỏ hàng của bạn đang trống trơn. Bạn cần thêm sách vào giỏ trước khi mượn nha.";
+            return "Giỏ hàng trống trơn à.";
         }
 
         StringBuilder response = new StringBuilder();
@@ -65,24 +66,26 @@ public class BorrowTool {
 
                 successCount++;
                 borrowedBookIds.add(bookId);
-                response.append(" Đã đăng ký mượn sách '").append(bookName).append("'.\n");
+                // response.append(" Đã đăng ký mượn sách '").append(bookName).append("'.\n"); // Bỏ dòng này cho đỡ dài
 
             } catch (MaxBorrowLimitExceededException e) {
-                response.append(" Không thể mượn sách '").append(item.getTenSach()).append("': ").append(e.getMessage()).append("\n");
-                response.append("... Đã dừng việc mượn các sách còn lại do đạt giới hạn.\n");
+                response.append("Lỗi: Quá hạn mức mượn sách.\n");
                 break;
-            } catch (RuntimeException e) {
-                 response.append("Không thể mượn sách '").append(item.getTenSach()).append("': ").append(e.getMessage()).append("\n");
             } catch (Exception e) {
-                response.append("Không thể mượn sách '").append(item.getTenSach()).append("': Đã xảy ra lỗi không mong muốn. Bạn thử lại sau nhé.\n");
+                response.append("Lỗi sách '").append(item.getTenSach()).append("': ").append(e.getMessage()).append("\n");
             }
         }
 
         if (successCount > 0) {
-            cartService.removeBooksFromCart(user, borrowedBookIds);
-            response.append("\n Tui đã đăng ký mượn thành công rùi á.").append(successCount).append(" cuốn sách cho bạn và xóa chúng khỏi giỏ hàng. Bạn nhớ ghé thư viện lấy sách sớm nha!");
+            try {
+                cartService.removeBooksFromCart(user, borrowedBookIds);
+                // Trả về câu ngắn gọn để tránh lỗi Lag context
+                response.append("Đã đăng ký mượn thành công ").append(successCount).append(" cuốn và xóa khỏi giỏ hàng.");
+            } catch (Exception e) {
+                response.append("Đã mượn được ").append(successCount).append(" cuốn, nhưng lỗi khi xóa khỏi giỏ (bạn xóa tay nha).");
+            }
         } else {
-            response.append("\nRất tiếc, không có cuốn sách nào được đăng ký mượn thành công.");
+            response.append("Không mượn được cuốn nào cả.");
         }
 
         return response.toString();
@@ -102,52 +105,47 @@ public class BorrowTool {
                 .collect(Collectors.toList());
 
             if (activeCards.isEmpty() && requestedCards.isEmpty()) {
-                return "Hiện tại bạn không có sách nào đang mượn hoặc đang chờ lấy cả.";
+                return "Bạn không có sách nào đang mượn.";
             }
 
-            StringBuilder response = new StringBuilder("Oce, để tui xem...\n");
+            StringBuilder response = new StringBuilder();
             if (!requestedCards.isEmpty()) {
-                response.append("- Bạn có ").append(requestedCards.size()).append(" cuốn đang chờ lấy tại thư viện.\n");
+                response.append("Đang chờ lấy: ").append(requestedCards.size()).append(" cuốn. ");
             }
             if (!activeCards.isEmpty()) {
-                response.append("- Bạn có ").append(activeCards.size()).append(" cuốn đang mượn.\n");
+                response.append("Đang mượn: ").append(activeCards.size()).append(" cuốn.");
             }
             
-            return response.toString().trim(); 
+            return response.toString(); 
         } catch (Exception e) {
-            return "Xin lỗi, tui gặp lỗi khi kiểm tra tình trạng mượn sách: " + e.getMessage();
+            return "Lỗi kiểm tra: " + e.getMessage();
         }
     }
 
+    // --- SỬA 2: TRẢ VỀ CÂU NGẮN GỌN ĐỂ AI KHÔNG BỊ LAG KHI GỌI 2 LẦN ---
     @Tool("Dùng tool này để đăng ký mượn MỘT cuốn sách cụ thể theo ID sách (MaSach). Cần userId và bookId.")
     public String registerBorrowSingleBook(String userId, String bookId) {
-    try {
-        User user = getUser(userId);
-        Long bId = Long.parseLong(bookId);
-        Book book = bookService.getBookbyID(bId); 
-        String bookName = book.getTenSach();
-        BorrowCardDTO dto = new BorrowCardDTO();
-        dto.setUserId(user.getId());
-        dto.setMaSach(bId);
-        dto.setTenSach(bookName); 
-        borrowCardService.createBorrowCard(dto); 
         try {
-             cartService.removeBooksFromCart(user, List.of(bId));
+            User user = getUser(userId);
+            Long bId = Long.parseLong(bookId);
+            
+            // Logic mượn
+            Book book = bookService.getBookbyID(bId); 
+            BorrowCardDTO dto = new BorrowCardDTO();
+            dto.setUserId(user.getId());
+            dto.setMaSach(bId);
+            dto.setTenSach(book.getTenSach()); 
+            borrowCardService.createBorrowCard(dto); 
+            
+            // Logic xóa giỏ (không quan trọng lắm nếu lỗi)
+            try {
+                 cartService.removeBooksFromCart(user, List.of(bId));
+            } catch (Exception e) {}
+
+            return "Đã đăng ký mượn sách ID " + bookId + " thành công.";
+
         } catch (Exception e) {
-             System.err.println("Lưu ý: Không xóa được sách ID " + bId + " khỏi giỏ hàng sau khi mượn: " + e.getMessage());
+            return "Lỗi mượn sách ID " + bookId + ": " + e.getMessage();
         }
-
-
-        return "Okela, tui đã đăng ký mượn sách '" + bookName + "' (ID: " + bookId + ") cho bạn rồi. Nhớ ghé thư viện lấy nha!";
-
-    } catch (Exception e) {
-    System.err.println("--- LỖI THẬT SỰ TRONG BORROWTOOL ĐÂY ---");
-    e.printStackTrace(); 
-    System.err.println("--- HẾT LỖI ---");
-
-    return "Ui, lỗi khi đăng ký mượn sách ID " + bookId + ". Bạn thử lại sau nha. (Debug: " + e.getMessage() + ")";
     }
-}
-
-
 }
