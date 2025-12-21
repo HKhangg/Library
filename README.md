@@ -2,7 +2,6 @@
 
 Website quản lý thư viện hỗ trợ quản lý sách, người dùng, và các giao dịch mượn trả sách một cách hiệu quả, với giao diện riêng cho người dùng và quản trị viên.
 
-> 🔗 Link GitHub repository: 
 ---
 
 ## 📋 Mục lục
