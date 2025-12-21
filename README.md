@@ -1,4 +1,4 @@
-# [IS216.P23] - ĐỒ ÁN XÂY DỰNG WEBSITE QUẢN LÝ THƯ VIỆN
+# [IS207.Q14] - ĐỒ ÁN XÂY DỰNG WEBSITE QUẢN LÝ THƯ VIỆN
 
 Website quản lý thư viện hỗ trợ quản lý sách, người dùng, và các giao dịch mượn trả sách một cách hiệu quả, với giao diện riêng cho người dùng và quản trị viên.
 
@@ -11,7 +11,6 @@ Website quản lý thư viện hỗ trợ quản lý sách, người dùng, và 
 - Thành viên
 - Công nghệ sử dụng
 - Yêu cầu trước khi cài đặt
-- Hướng dẫn cài đặt
 - Cấu hình cơ sở dữ liệu
 - Cấu hình bổ sung
 - Lưu ý khi chạy project
@@ -22,8 +21,8 @@ Website quản lý thư viện hỗ trợ quản lý sách, người dùng, và 
 
 - **Trường**: Đại học Công nghệ Thông tin, Đại học Quốc gia TP. HCM (ĐHQG-HCM)
 - **Khoa**: Hệ Thống Thông Tin
-- **GVHD**: ThS. Tạ Việt Phương
-- **Nhóm sinh viên thực hiện**: Nhóm 8386
+- **GVHD**: ThS. Vũ Minh Sang
+- **Nhóm sinh viên thực hiện**: Rì Ắc
 
 ---
 
@@ -31,10 +30,10 @@ Website quản lý thư viện hỗ trợ quản lý sách, người dùng, và 
 
 | STT | Họ tên                | MSSV     | Chức vụ       |
 |-----|-----------------------|----------|---------------|
-| 1   | Nguyễn Lê Thanh Huyền | 22520590 | Nhóm trưởng   |
-| 2   | Lê Thị Phương Thảo    | 23521468 | Thành viên    |
-| 3   | Lê Thị Thùy Trang     | 23521627 | Thành viên    |
-| 4   | Nguyễn Thanh Trí      | 23521645 | Thành viên    |
+| 1   | Lê Thị Phương Thảo    | 23521468 | Nhóm trưởng   |
+| 2   | Mai Huy Khang         | 23520692 | Thành viên    |
+| 3   | Vòng Việt Đức         | 23520324 | Thành viên    |
+| 4   | Nguyễn Gia Bảo        | 23520120 | Thành viên    |
 
 ---
 
@@ -62,43 +61,6 @@ Trước khi bắt đầu, hãy đảm bảo đã cài đặt các phần mềm 
 - Tài khoản [Cloudinary](https://cloudinary.com/) để lưu trữ hình ảnh
 
 ---
-
-## ⚙️ Hướng dẫn cài đặt
-
-### 1. Clone project về máy
-
-```bash
-git clone https://github.com/yurri2506/IS216_QuanLyThuVien.git
-cd IS216_QuanLyThuVien
-```
-
-### 2. Cài đặt và chạy backend (Spring Boot)
-
-- Mở thư mục `backend2/library`
-- Chạy lệnh sau để khởi động backend:
-  ```bash
-  ./mvnw spring-boot:run
-  ```
-
-### 3. Cài đặt và chạy frontend
-
-#### 🖥 Frontend cho người dùng (frontend-user)
-
-```bash
-cd frontend-user
-npm install
-npm run dev
-```
-- Truy cập: [http://localhost:3000](http://localhost:3000)
-
-#### 🛠 Frontend cho quản trị viên (frontend-admin)
-
-```bash
-cd ../frontend-admin
-npm install
-npm run dev
-```
-- Truy cập: [http://localhost:3001](http://localhost:3001)
 
 ### 🗂️ Cấu hình môi trường Frontend
 
