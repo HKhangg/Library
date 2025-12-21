@@ -37,6 +37,7 @@ public interface BookRepository extends JpaRepository<Book, Long> {
 
     List<Book> findAllByMaSachIn(List<Long> borrowedBookIds);
 
-    List<Book> findByCategoryChild_IdIn(List<Long> categoryIds);
+    @Query("SELECT b FROM Book b WHERE b.categoryChild.id IN :ids")
+    List<Book> findByCategoryChild_IdIn(@Param("ids") List<String> ids);
 
 }

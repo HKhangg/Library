@@ -58,9 +58,14 @@ public class LangChainService {
         3. **Trung thực:** Tool lỗi/không có dữ liệu -> Báo lỗi/không tìm thấy. KHÔNG BỊA SÁCH.
         4. **Ghi nhớ:** Nếu user chia sẻ sở thích/thông tin cá nhân -> Gọi `saveMemory`. Sau đó nhớ thông báo xác nhận đã ghi nhớ với người dùng.
         5. LƯU Ý: TUYỆT ĐỐI KHÔNG được lặp lại, sao chép, hoặc nhắc đến chuỗi "[[Thông tin người dùng hiện tại: userId=...]]" trong câu trả lời của bạn.**
-        
-        **Đa nhiệm (QUAN TRỌNG):** Nếu user yêu cầu nhiều việc (VD: "Mượn A và Thêm B"), làm TUẦN TỰ:
-        - Gọi tool việc 1 -> Chờ kết quả -> Gọi tool việc 2 -> Tổng hợp trả lời 1 lần duy nhất.
+        6. KHI TRẢ LỜI CÁC CÂU HỎI NHƯ 'còn lại', 'tiếp theo', HÃY KIỂM TRA KỸ LỊCH SỬ TIN NHẮN GẦN NHẤT để xác định chính xác danh sách sách đang được thảo luận. KHÔNG ĐƯỢC BỊA RA sách mới.
+        7. **!!! QUY TẮC XỬ LÝ ĐA NHIỆM (TUẦN TỰ NGẦM) !!!**
+            * Nếu người dùng yêu cầu **NHIỀU HÀNH ĐỘNG** (ví dụ: "mượn A VÀ thêm B"), bạn phải xử lý **TUẦN TỰ TỪNG BƯỚC MỘT**.
+            * **Bước 1:** Chọn hành động đầu tiên. Gọi tool tương ứng (VÍ DỤ: `borrow(A)`).
+            * **Bước 2:** **Ghi nhớ** hành động thứ hai còn lại (VÍ DỤ: thêm B).
+            * **Bước 3:** **NGAY SAU KHI** nhận kết quả tool 1, **HÃY TIẾP TỤC** gọi tool cho hành động thứ hai (VÍ DỤ: `addToCart(B)`). **KHÔNG ĐƯỢC HỎI LẠI USER Ở GIỮA.**
+            * **Bước 4:** Sau khi nhận kết quả tool 2, hãy **tổng hợp kết quả CẢ HAI HÀNH ĐỘNG** và trả lời người dùng **MỘT LẦN DUY NHẤT.**
+            * **VÍ DỤ LUỒNG:** User: "Mượn A và Thêm B". -> AI: [Gọi borrow(A)] -> (Tool trả: OK) -> AI (nhớ còn việc B): [Gọi addToCart(B)] -> (Tool trả: OK) -> AI trả lời: "Ok, tui đã mượn A và thêm B vào giỏ cho bạn rồi nha."
 
        ### HƯỚNG DẪN CHỌN TOOL (ROUTING)
         Hãy phân tích ý định (Intent) của user thật kỹ trước khi gọi tool:
@@ -126,7 +131,7 @@ public class LangChainService {
     @Autowired private ChatMemoryService chatMemoryService;
 
     @Autowired private SuggestionTool2 suggestionTool2;
-    @Autowired private CategoryTool categoryTool; 
+    //@Autowired private CategoryTool categoryTool; 
     @Autowired private CategoryTool2 categoryTool2;
     @Autowired private BookTool2 bookTool2;
     @Autowired private CartTool cartTool;
@@ -153,7 +158,7 @@ public class LangChainService {
     public void initializeAssistant() {
         this.assistant = AiServices.builder(Assistant.class)
                 .chatLanguageModel(chatLanguageModel)
-                .tools(bookTool2, cartTool, borrowTool, categoryTool2, categoryTool, userTool, fineTool, settingTool, memoryTool, suggestionTool2, descriptionTool)
+                .tools(bookTool2, cartTool, borrowTool, categoryTool2, userTool, fineTool, settingTool, memoryTool, suggestionTool2, descriptionTool)
                 .contentRetriever(faqRetriever)
                 .chatMemoryProvider(memoryId -> activeChatMemories.computeIfAbsent(memoryId, id -> {
                     /*
@@ -235,7 +240,7 @@ public String getResponse(Long userId, String userMessage) {
         
         } catch (Exception e) {
             String msg = e.getMessage();
-        
+                   
             System.err.println("ERROR Details: " + e.toString()); 
             if (e instanceof NullPointerException || (msg != null && msg.contains("parts"))) {
                 return "Ui, câu hỏi này chứa từ khóa nhạy cảm nên Google chặn rồi. Bạn hỏi lái sang cách khác nha!";
@@ -244,15 +249,17 @@ public String getResponse(Long userId, String userMessage) {
                 return "Ui, tui hết năng lượng rồi. Nghỉ 2 phút nha!";
             }
             if (msg != null && (msg.contains("400") || msg.contains("function call") || msg.contains("Please ensure"))) {
-                System.out.println("LỖI 400 -> RESET RAM & DB (TRIM 2)");
+                System.out.println("LỖI 400 NỮA NÈ MÁ MỆT GHÊ ÁDNIDJODJJDODJ");
                 try {
                     activeChatMemories.remove(sessionId);
                     chatMemoryService.removeLastNMessages(userId, 2); 
 
-                    return assistant.chat(sessionId, fullMessage); 
+                  return "Hehe bị rối xíu, bạn nói rõ lại yêu cầu giúp Hehe nheee !";
+                  //  return assistant.chat(sessionId, fullMessage); 
                     
                 } catch (Exception retryEx) {
-                    return "Ui, tui bị lag nhẹ. Phiền bạn hỏi lại câu vừa nãy giúp tui nha!";
+                    System.err.println("Lỗi khi cố gắng reset bộ nhớ: " + retryEx.getMessage());
+                    return "Ui, tui bị lag nhẹ. Phiền bạn hỏi lại câu vừa nãy giúp tui nhee !";
                 }
             }
             

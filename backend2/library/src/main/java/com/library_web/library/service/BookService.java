@@ -49,6 +49,6 @@ public interface BookService {
     List<Book> getBooksByCategoryChildV2(String categoryChildId, String filter);
      List<Book> getBooksByCategoryParentV2(Long categoryParentId, String filter);
      List<Book> getBooksByListIds(List<Long> ids);    
-     List<Book> getBooksByListCategoryChildIds(List<Long> ids);
+     List<Book> getBooksByListCategoryChildIds(List<String> ids);
 
 }

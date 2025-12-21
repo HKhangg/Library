@@ -1,6 +1,6 @@
 package com.library_web.library.service;
 
-import com.library_web.library.chat.service.BookEnrichmentService;
+//import com.library_web.library.chat.service.BookEnrichmentService;
 import com.library_web.library.model.Book;
 import com.library_web.library.model.BookChild;
 import com.library_web.library.model.BorrowCard;
@@ -17,7 +17,7 @@ import com.library_web.library.repository.BorrowCardRepository;
 
 import jakarta.transaction.Transactional;
 
-import org.springframework.beans.factory.annotation.Autowired;
+//import org.springframework.beans.factory.annotation.Autowired;
 //import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -37,8 +37,8 @@ public class BookServiceImpl implements BookService {
     private final CategoryChildRepository childRepo;
     //@Autowired
     //private EmbeddingModel embeddingModel;
-    @Autowired
-    private BookEnrichmentService bookEnrichmentService;
+   // @Autowired
+    //private BookEnrichmentService bookEnrichmentService;
 
 /*     private String buildBookTextForEmbedding(Book b) {
     StringBuilder sb = new StringBuilder();
@@ -68,9 +68,10 @@ public class BookServiceImpl implements BookService {
     }
 
     
-    public List<Book> getBooksByListCategoryChildIds(List<Long> ids) {
+    @Override
+    public List<Book> getBooksByListCategoryChildIds(List<String> ids) {
         if (ids == null || ids.isEmpty()) return new ArrayList<>();
-        return repo.findByCategoryChild_IdIn(ids);
+        return repo.findByCategoryChild_IdIn(ids); 
     }
 
     @Override
@@ -157,7 +158,7 @@ public class BookServiceImpl implements BookService {
         }
         saved.setTongSoLuong(initialQuantity);
         saved.updateTrangThai();
-        bookEnrichmentService.enrichAndIngestBook(saved);
+       // bookEnrichmentService.enrichAndIngestBook(saved);
         return repo.save(saved);
     }
 

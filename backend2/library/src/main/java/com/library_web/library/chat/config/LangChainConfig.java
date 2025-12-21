@@ -309,7 +309,7 @@ public class LangChainConfig {
                                               EmbeddingModel embeddingModel) {
         return EmbeddingStoreContentRetriever.builder()
                 .embeddingStore(embeddingStore).embeddingModel(embeddingModel)
-                .maxResults(3).minScore(0.6)
+                .maxResults(3).minScore(0.75)
                 .build();
     }
 
@@ -382,7 +382,7 @@ public class LangChainConfig {
                                            EmbeddingModel embeddingModel) {
          return EmbeddingStoreContentRetriever.builder()
                  .embeddingStore(embeddingStore).embeddingModel(embeddingModel)
-                 .maxResults(5).minScore(0.65)
+                 .maxResults(5).minScore(0.75)
                  .build();
      }
 

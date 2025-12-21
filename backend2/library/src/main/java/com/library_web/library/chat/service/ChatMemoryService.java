@@ -87,13 +87,25 @@ public class ChatMemoryService {
         return "user_" + userId + "_session_" + nextNum;
     }
 
+
     public List<dev.langchain4j.data.message.ChatMessage> getHistoryAsLangChainMessages(Long userId) {
-        return getChatHistory(userId).stream()
+        Pageable limit = PageRequest.of(0, 11);
+        List<ChatMessage> history = chatMessageRepository.findByUser_IdOrderByTimestampDesc(userId, limit);
+        List<dev.langchain4j.data.message.ChatMessage> messages = history.stream()
                 .map(msg -> "USER".equalsIgnoreCase(msg.getRole())
-                        ? UserMessage.from(msg.getMessage())
-                        : AiMessage.from(msg.getMessage()))
+                        ? dev.langchain4j.data.message.UserMessage.from(msg.getMessage())
+                        : dev.langchain4j.data.message.AiMessage.from(msg.getMessage()))
                 .collect(Collectors.toList());
-    }
+        java.util.Collections.reverse(messages);
+            if (!messages.isEmpty()) {
+                dev.langchain4j.data.message.ChatMessage lastMessage = messages.get(messages.size() - 1);
+                if (lastMessage instanceof dev.langchain4j.data.message.UserMessage) {
+                    messages.remove(messages.size() - 1);
+                }
+            }
+
+            return messages;
+        }
     
     @Transactional
     @Scheduled(cron = "0 0 3 * * *")

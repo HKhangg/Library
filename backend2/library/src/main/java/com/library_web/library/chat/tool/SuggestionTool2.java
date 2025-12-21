@@ -34,10 +34,10 @@ public class SuggestionTool2 {
     @Autowired private EmbeddingModel embeddingModel;
 
     @Tool(name = "suggestBooksV2", value = {
-        "(Dùng RAG): Gợi ý sách dựa trên CHỦ ĐỀ, LỊCH SỬ MƯỢN, và (nếu có) BỐI CẢNH SỞ THÍCH.",
+        "(Dùng RAG): Dùng tool này khi người dùng KHÔNG biết rõ tên sách, muốn xin LỜI KHUYÊN, GỢI Ý, ĐỀ XUẤT đọc gì, hoặc tìm kiếm dựa trên CẢM XÚC, TÂM TRẠNG, SỞ THÍCH. VÍ DỤ: 'buồn quá đọc gì', 'gợi ý sách trinh thám hay', 'sách gì chữa lành tâm hồn'. Đây là tool dùng để 'Tư vấn' chứ không phải 'Tra cứu'.",
         "Input bao gồm:",
         "- userId (bắt buộc): ID người dùng.",
-        "- keywords (bắt buộc): Chủ đề/từ khóa người dùng muốn tìm (ví dụ: 'sách buồn', 'sách hay', 'học tiếng anh')."
+        "- keywords (bắt buộc): Chủ đề/từ khóa người dùng muốn được gợi ý (ví dụ: 'sách buồn', 'sách hay', 'học tiếng anh')."
     })
     public String suggestBooksV2(Long userId, String keywords) {
         if (keywords == null || keywords.trim().isEmpty()) {

@@ -25,7 +25,7 @@ public class BookTool2 {
     @Autowired
     private BookService bookService; 
 
-    @Tool("PHIÊN BẢN 2 (RAG + Verification): Dùng tool này để TÌM KIẾM SÁCH theo tên, tác giả, mô tả. Input là câu truy vấn.")
+    @Tool("PHIÊN BẢN 2 (RAG + Verification): Dùng tool này KHI VÀ CHỈ KHI người dùng muốn TÌM KIẾM cuốn sách CỤ THỂ, RÕ RÀNG (biết tên, biết tác giả, hoặc MÔ TẢ NỘI DUNG hay TỪ KHÓA khi người dùng không nhớ rõ (Plot/Content)). VÍ DỤ: 'tìm cuốn Mắt Biếc', 'sách của Nguyễn Nhật Ánh', 'sách về lập trình Java', 'sách về chú mèo máy', 'sách nói về chiến tranh biên giới'. TUYỆT ĐỐI KHÔNG dùng cho các câu hỏi xin lời khuyên, tâm sự hoặc gợi ý chung chung.")
     public String findBookV2(String query) {
         if (query == null || query.trim().isEmpty()) return "Bạn muốn tìm sách gì á?";
 
