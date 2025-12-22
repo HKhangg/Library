@@ -99,7 +99,7 @@ const teamMembers = [
   },
   {
     img: "/images/Khang.jpg",
-    name: "Huy Khang",
+    name: "Mai Huy Khang",
     mssv: "23520692",
   },
 ];

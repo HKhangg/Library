@@ -1,6 +1,8 @@
 package com.library_web.library.chat.repository;
 
 import com.library_web.library.chat.model.ChatMessage;
+
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -15,6 +17,7 @@ import java.util.Optional;
 public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> {
 
     List<ChatMessage> findByUser_IdOrderByTimestampAsc(Long userId);
+    List<ChatMessage> findByUser_IdOrderByTimestampDesc(Long userId, Pageable pageable);
 
     Optional<ChatMessage> findTopByUser_IdOrderByTimestampDesc(Long userId);
     @Transactional
