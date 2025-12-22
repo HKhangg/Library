@@ -11,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestController
@@ -23,27 +24,68 @@ public class BorrowCardController {
   @Autowired
   private EmailService emailService;
 
+  public static class CreateBorrowCardRequest {
+    private Long userId;
+    private java.util.List<Long> bookIds;
+
+    public Long getUserId() {
+      return userId;
+    }
+
+    public void setUserId(Long userId) {
+      this.userId = userId;
+    }
+
+    public java.util.List<Long> getBookIds() {
+      return bookIds;
+    }
+
+    public void setBookIds(java.util.List<Long> bookIds) {
+      this.bookIds = bookIds;
+    }
+  }
+
   @GetMapping
   public ResponseEntity<List<BorrowCard>> getAll() {
     return ResponseEntity.ok(service.getAll());
   }
 
+  // Hiện thị chi tiết phiếu mượn
   @GetMapping("/{id}")
   public ResponseEntity<BorrowCardDTO> getBorrowCardDetails(@PathVariable Long id) {
     BorrowCardDTO details = service.getBorrowCardDetails(id);
     return ResponseEntity.ok(details);
   }
 
-  // Tạo phiếu mượn
+  // Tạo phiếu mượn sửa
   @PostMapping
-  public ResponseEntity<BorrowCard> create(@RequestBody BorrowCard BorrowCardRequest) {
-    System.out.println("BorrowCardRequest: " + BorrowCardRequest);
-    List<Long> bookIds = BorrowCardRequest.getBorrowedBooks().stream()
-        .map(borrowedBook -> borrowedBook.getBookId())
-        .collect(Collectors.toList());
-    BorrowCard borrowCard = service.create(BorrowCardRequest.getUserId(), bookIds);
-    return ResponseEntity.ok(borrowCard);
+  public ResponseEntity<?> create(@RequestBody CreateBorrowCardRequest req) {
+    try {
+      System.out.println("Request create card: userId=" + req.getUserId() + ", bookIds=" + req.getBookIds());
+      BorrowCard borrowCard = service.create(req.getUserId(), req.getBookIds());
+      return ResponseEntity.ok(borrowCard);
+    } catch (Exception e) {
+      System.err.println("❌ Lỗi khi tạo phiếu mượn: " + e.getMessage());
+      e.printStackTrace();
+      return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
+    }
   }
+
+  /*
+   * // Tạo phiếu mượn
+   * 
+   * @PostMapping
+   * public ResponseEntity<BorrowCard> create(@RequestBody BorrowCard
+   * BorrowCardRequest) {
+   * System.out.println("BorrowCardRequest: " + BorrowCardRequest);
+   * List<Long> bookIds = BorrowCardRequest.getBorrowedBooks().stream()
+   * .map(borrowedBook -> borrowedBook.getBookId())
+   * .collect(Collectors.toList());
+   * BorrowCard borrowCard = service.create(BorrowCardRequest.getUserId(),
+   * bookIds);
+   * return ResponseEntity.ok(borrowCard);
+   * }
+   */
 
   // @PutMapping("/{id}")
   // public ResponseEntity<BorrowCardDTO> update(@PathVariable Long id,
@@ -67,10 +109,10 @@ public class BorrowCardController {
     return ResponseEntity.ok(borrowCards); // Trả về danh sách phiếu mượn của người dùng
   }
 
-  // Cập nhật phiếu mượn khi người dùng đến lấy sách
+  // Cập nhật phiếu mượn khi quét barcode mượn sách
   @PutMapping("/borrow/{id}")
-  public ResponseEntity<BorrowCard> borrowBooks(@PathVariable Long id, @RequestBody List<String> childBookIds) {
-    BorrowCard borrowCard = service.updateBorrowCardToBorrowing(id, childBookIds);
+  public ResponseEntity<BorrowCard> borrowBooks(@PathVariable Long id, @RequestBody List<String> barcodes) {
+    BorrowCard borrowCard = service.updateBorrowCardToBorrowing(id, barcodes);
     return ResponseEntity.ok(borrowCard);
   }
 
@@ -78,6 +120,15 @@ public class BorrowCardController {
   public ResponseEntity<BorrowCard> returnBooks(@PathVariable Long id) {
     BorrowCard borrowCard = service.updateBorrowCardOnReturn(id);
     return ResponseEntity.ok(borrowCard);
+  }
+
+  @PutMapping("/return-one/{cardId}")
+  public ResponseEntity<BorrowCard> returnOneBook(
+      @PathVariable Long cardId,
+      @RequestBody Map<String, String> body) {
+    String barcode = body.get("barcode");
+    BorrowCard updated = service.returnOneBook(cardId, barcode);
+    return ResponseEntity.ok(updated);
   }
 
   // Cập nhật phiếu mượn khi người dùng trả sách
