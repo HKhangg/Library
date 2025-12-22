@@ -1,115 +1,126 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import axios from "axios";
 import Sidebar from "../components/sidebar/Sidebar";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation"; // Import hooks điều hướng
 import { Pencil, Plus, Search, Trash2 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import { ThreeDot } from "react-loading-indicators";
 
+import useSWR, { mutate } from "swr";
+
+const authFetcher = async (url) => {
+  const token = localStorage.getItem("accessToken");
+  const response = await axios.get(url, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      Accept: "*/*",
+    },
+  });
+  return response.data;
+};
+
 const Page = () => {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [userList, setUserList] = useState([]);
-  const [filteredUsers, setFilteredUsers] = useState([]);
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  // Lấy trạng thái từ URL thay vì useState
+  const currentPage = Number(searchParams.get("page")) || 1;
+  const urlSearchQuery = searchParams.get("query") || "";
+
+  // State cục bộ cho ô input tìm kiếm
+  const [localSearchQuery, setLocalSearchQuery] = useState(urlSearchQuery);
+
   const [popUpOpen, setPopUpOpen] = useState(false);
   const [deleteOne, setDeleteOne] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [currentPage, setCurrentPage] = useState(1); // Current page state
-  const [itemsPerPage] = useState(10); // Number of users per page
-  const router = useRouter();
+  const itemsPerPage = 10;
 
-  // Fetch users from the backend using axios
-  const fetchUsers = async () => {
-    setLoading(true);
-    try {
-      const response = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/users`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
-            "Content-Type": "application/json",
-            Accept: "*/*",
-          },
-        }
-      );
-      setUserList(response.data.data || []);
-      setFilteredUsers(response.data.data || []);
-      setCurrentPage(1); // Reset to first page
-      toast.success("Lấy danh sách người dùng thành công", {
-        style: { background: "#d1fae5", color: "#065f46" },
-      });
-    } catch (error) {
-      console.error("Error fetching users:", {
-        message: error.message,
-        response: error.response
-          ? {
-              status: error.response.status,
-              data: error.response.data,
-            }
-          : "No response data",
-      });
-      toast.error("Quyền truy cập bị từ chối, hãy đăng nhập lại", {
-        style: { background: "#fee2e2", color: "#991b1b" },
-        duration: 1500,
-      });
-      setTimeout(() => {
-        router.push("/admin-login");
-      }, 1500);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Fetch users on component mount
+  // Đồng bộ URL search query vào ô input khi URL thay đổi (ví dụ khi nhấn Back)
   useEffect(() => {
-    fetchUsers();
-  }, []);
+    setLocalSearchQuery(urlSearchQuery);
+  }, [urlSearchQuery]);
 
-  // Handle search functionality
-  const handleSearch = () => {
-    if (searchQuery.trim()) {
-      const filtered = userList.filter(
-        (user) =>
-          user.id.toString().includes(searchQuery) ||
-          user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (user.email &&
-            user.email.toLowerCase().includes(searchQuery.toLowerCase())) ||
-          (user.phone &&
-            user.phone.toLowerCase().includes(searchQuery.toLowerCase()))
-      );
-      if (filtered.length === 0) {
-        toast.error("Không tìm thấy người dùng", {
-          style: { background: "#fee2e2", color: "#991b1b" },
-        });
-      }
-      setFilteredUsers(filtered);
-      setCurrentPage(1); // Reset to first page
-    } else {
-      setFilteredUsers(userList);
-      setCurrentPage(1); // Reset to first page
+  // Fetch dữ liệu
+  const {
+    data: responseData,
+    isLoading,
+    error,
+  } = useSWR(
+    `${process.env.NEXT_PUBLIC_API_URL}/api/admin/users`,
+    authFetcher,
+    {
+      revalidateOnFocus: false,
+      dedupingInterval: 60000,
+      onError: (err) => {
+        if (err.response?.status === 403 || err.response?.status === 401) {
+          toast.error("Phiên đăng nhập hết hạn");
+          router.push("/admin-login");
+        }
+      },
     }
+  );
+
+  const userList = responseData?.data || [];
+
+  // Logic tìm kiếm (Filter dựa trên từ khóa từ URL)
+  const filteredUsers = useMemo(() => {
+    if (!urlSearchQuery.trim()) return userList;
+
+    const lowerQuery = urlSearchQuery.toLowerCase();
+    return userList.filter(
+      (user) =>
+        user.id.toString().includes(lowerQuery) ||
+        user.username.toLowerCase().includes(lowerQuery) ||
+        (user.email && user.email.toLowerCase().includes(lowerQuery)) ||
+        (user.phone && user.phone.toLowerCase().includes(lowerQuery))
+    );
+  }, [urlSearchQuery, userList]);
+
+  // Hàm cập nhật URL
+  const updateURL = (key, value) => {
+    const params = new URLSearchParams(searchParams);
+    if (value) {
+      params.set(key, value);
+    } else {
+      params.delete(key);
+    }
+    // replace: thay thế URL hiện tại mà không thêm vào history stack (hoặc dùng push nếu muốn back lại từng bước search)
+    router.replace(`${pathname}?${params.toString()}`);
   };
 
-  // Handle delete user using axios
-  const handleDelete = async (user) => {
-    setLoading(true);
-    try {
-      const token = localStorage.getItem("accessToken");
-      if (!token) {
-        toast.error("Quyền truy cập bị từ chối, hãy đăng nhập lại", {
-          style: { background: "#fee2e2", color: "#991b1b" },
-          duration: 1500,
-        });
-        setTimeout(() => {
-          router.push("/admin-login");
-        }, 1500);
-        setLoading(false);
-        return;
-      }
+  // Handle Search Submit
+  const handleSearch = () => {
+    const params = new URLSearchParams(searchParams);
+    if (localSearchQuery) {
+      params.set("query", localSearchQuery);
+    } else {
+      params.delete("query");
+    }
+    params.set("page", 1); // Reset về trang 1 khi tìm kiếm
+    router.replace(`${pathname}?${params.toString()}`);
+  };
 
-      const response = await axios.delete(
+  // Handle Page Change
+  const handlePageChange = (pageNumber) => {
+    updateURL("page", pageNumber);
+  };
+
+  const handleDelete = async (user) => {
+    const token = localStorage.getItem("accessToken");
+    if (!token) {
+      toast.error("Vui lòng đăng nhập lại");
+      router.push("/admin-login");
+      return;
+    }
+
+    const toastId = toast.loading("Đang xóa người dùng...");
+
+    try {
+      await axios.delete(
         `${process.env.NEXT_PUBLIC_API_URL}/api/admin/users/${user.id}`,
         {
           headers: {
@@ -120,102 +131,93 @@ const Page = () => {
         }
       );
 
+      mutate(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/users`,
+        (currentData) => {
+          if (!currentData) return currentData;
+          return {
+            ...currentData,
+            data: currentData.data.filter((u) => u.id !== user.id),
+          };
+        },
+        false
+      );
+
       toast.success("Xóa người dùng thành công", {
+        id: toastId,
         style: { background: "#d1fae5", color: "#065f46" },
       });
+
       setPopUpOpen(false);
       setDeleteOne(null);
-      await fetchUsers();
-    } catch (error) {
-      console.error("Error deleting user:", {
-        message: error.message,
-        response: error.response
-          ? {
-              status: error.response.status,
-              data: error.response.data,
-              headers: error.response.headers,
-            }
-          : "No response data",
-      });
 
-      toast.error("Quyền truy cập bị từ chối, hãy đăng nhập lại", {
+      // Nếu xóa hết item ở trang hiện tại, lùi về trang trước
+      if (currentUsers.length === 1 && currentPage > 1) {
+        handlePageChange(currentPage - 1);
+      }
+
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      toast.error("Xóa thất bại! Vui lòng thử lại.", {
+        id: toastId,
         style: { background: "#fee2e2", color: "#991b1b" },
-        duration: 1500,
       });
-      setTimeout(() => {
-        router.push("/admin-login");
-      }, 1500);
-      setPopUpOpen(false);
-    } finally {
-      setLoading(false);
     }
   };
 
-  // Navigate to add user page
   const handleAddUser = () => {
     router.push("/users/addUser");
   };
 
-  // Navigate to edit user page
   const handleEdit = (userId) => {
+    // URL hiện tại được lưu trong trình duyệt
     router.push(`/users/${userId}`);
   };
 
-  // Calculate displayed users based on pagination
+  // Pagination Calculation
   const indexOfLastUser = currentPage * itemsPerPage;
   const indexOfFirstUser = indexOfLastUser - itemsPerPage;
   const currentUsers = filteredUsers.slice(indexOfFirstUser, indexOfLastUser);
+  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage) || 1;
 
-  // Calculate total pages
-  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
-
-  // Handle page change
-  const handlePageChange = (pageNumber) => {
-    if (pageNumber >= 1 && pageNumber <= totalPages) {
-      setCurrentPage(pageNumber);
-    }
-  };
-
-  // UserCard component
-  const UserCard = ({ user }) => {
-    return (
-      <div className="flex bg-white w-full rounded-lg mt-2 drop-shadow-lg p-5 gap-5 md:gap-10 items-center">
-        <img
-          src={user.avatar_url || "/default-avatar.png"}
-          alt={user.username}
-          className="w-[145px] h-[205px] object-cover rounded"
-        />
-        <div className="flex flex-col gap-3 w-full">
-          <p>ID: {user.id}</p>
-          <p className="font-bold">{user.username}</p>
-          <p>Email: {user.email || "N/A"}</p>
-          <p>Số điện thoại: {user.phone || "N/A"}</p>
-          <p>Vai trò: {user.role || "USER"}</p>
-          <div className="flex justify-end gap-5">
-            <Button
-              className="w-10 md:w-40 h-10 bg-[#062D76] hover:bg-gray-700 cursor-pointer"
-              onClick={() => handleEdit(user.id)}
-            >
-              <Pencil className="w-5 h-5" color="white" />
-              <p className="hidden md:block">Sửa người dùng</p>
-            </Button>
-            <Button
-              className="w-10 md:w-40 h-10 bg-[#D66766] hover:bg-gray-700 cursor-pointer"
-              onClick={() => {
-                setDeleteOne(user);
-                setPopUpOpen(true);
-              }}
-            >
-              <Trash2 className="w-5 h-5" color="white" />
-              <p className="hidden md:block">Xóa người dùng</p>
-            </Button>
-          </div>
+  // Components UI
+  const UserCard = ({ user }) => (
+    <div className="flex bg-white w-full rounded-lg mt-2 drop-shadow-lg p-5 gap-5 md:gap-10 items-center">
+      <img
+        src={user.avatar_url || "/default-avatar.png"}
+        alt={user.username}
+        className="w-[145px] h-[205px] object-cover rounded"
+        onError={(e) => (e.target.src = "/default-avatar.png")}
+      />
+      <div className="flex flex-col gap-3 w-full">
+        <p>ID: {user.id}</p>
+        <p className="font-bold">{user.username}</p>
+        <p>Email: {user.email || "N/A"}</p>
+        <p>Số điện thoại: {user.phone || "N/A"}</p>
+        <p>Vai trò: {user.role || "USER"}</p>
+        <div className="flex justify-end gap-5">
+          <Button
+            className="w-10 md:w-40 h-10 bg-[#062D76] hover:bg-gray-700 cursor-pointer"
+            onClick={() => handleEdit(user.id)}
+          >
+            <Pencil className="w-5 h-5" color="white" />
+            <p className="hidden md:block">Sửa người dùng</p>
+          </Button>
+          <Button
+            className="w-10 md:w-40 h-10 bg-[#D66766] hover:bg-gray-700 cursor-pointer"
+            onClick={() => {
+              setDeleteOne(user);
+              setPopUpOpen(true);
+            }}
+          >
+            <Trash2 className="w-5 h-5" color="white" />
+            <p className="hidden md:block">Xóa người dùng</p>
+          </Button>
         </div>
       </div>
-    );
-  };
+    </div>
+  );
 
-  // Generate page numbers for pagination
   const pageNumbers = [];
   for (let i = 1; i <= totalPages; i++) {
     pageNumbers.push(i);
@@ -225,15 +227,9 @@ const Page = () => {
     <div className="flex flex-row w-full min-h-screen bg-[#EFF3FB]">
       <Toaster position="top-center" reverseOrder={false} />
       <Sidebar />
-      {loading ? (
+      {isLoading ? (
         <div className="flex md:ml-52 w-full h-screen justify-center items-center">
-          <ThreeDot
-            color="#062D76"
-            size="large"
-            text="Vui lòng chờ"
-            variant="bounce"
-            textColor="#062D76"
-          />
+          <ThreeDot color="#062D76" size="large" text="Vui lòng chờ" variant="bounce" textColor="#062D76" />
         </div>
       ) : (
         <div className="flex w-full flex-col py-6 md:ml-52 mt-5 gap-2 items-center px-10">
@@ -241,10 +237,11 @@ const Page = () => {
             <div className="flex gap-5">
               <Input
                 type="text"
-                placeholder="Tìm kiếm người dùng (ID, tên, email, số điện thoại)"
+                placeholder="Tìm kiếm người dùng..."
                 className="w-full md:w-96 h-10 font-thin italic text-black text-lg bg-white rounded-[10px]"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                value={localSearchQuery}
+                onChange={(e) => setLocalSearchQuery(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
               />
               <Button
                 className="w-10 h-10 bg-[#062D76] hover:bg-gray-700 rounded-[10px] cursor-pointer"
@@ -261,18 +258,20 @@ const Page = () => {
               Thêm người dùng
             </Button>
           </div>
+
           {currentUsers.length > 0 ? (
             currentUsers.map((user) => <UserCard key={user.id} user={user} />)
           ) : (
-            <p className="text-gray-500">Không có người dùng nào để hiển thị</p>
+            <p className="text-gray-500 mt-10">Không tìm thấy người dùng nào</p>
           )}
+
           {/* Pagination Controls */}
           {totalPages > 1 && (
             <div className="flex justify-center items-center gap-2 mt-6">
               <Button
                 onClick={() => handlePageChange(currentPage - 1)}
                 disabled={currentPage === 1}
-                className="bg-[#062D76] hover:bg-gray-700 text-white"
+                className="bg-[#062D76] hover:bg-gray-700 text-white cursor-pointer disabled:opacity-50"
               >
                 Trước
               </Button>
@@ -280,11 +279,10 @@ const Page = () => {
                 <Button
                   key={number}
                   onClick={() => handlePageChange(number)}
-                  className={`${
-                    currentPage === number
+                  className={`${currentPage === number
                       ? "bg-[#062D76] text-white"
-                      : "bg-white text-[#062D76] border border-[#062D76] hover:bg-gray-100"
-                  }`}
+                      : "bg-white text-[#062D76] border border-[#062D76] hover:bg-gray-100 cursor-pointer"
+                    }`}
                 >
                   {number}
                 </Button>
@@ -292,12 +290,14 @@ const Page = () => {
               <Button
                 onClick={() => handlePageChange(currentPage + 1)}
                 disabled={currentPage === totalPages}
-                className="bg-[#062D76] hover:bg-gray-700 text-white"
+                className="bg-[#062D76] hover:bg-gray-700 text-white cursor-pointer disabled:opacity-50"
               >
                 Sau
               </Button>
             </div>
           )}
+
+          {/* Delete Modal Code (Giữ nguyên) */}
           {popUpOpen && deleteOne && (
             <div className="fixed inset-0 flex items-center justify-center z-50">
               <div className="w-full h-full bg-black opacity-80 absolute top-0 left-0"></div>
@@ -307,30 +307,16 @@ const Page = () => {
                 <div className="flex bg-white w-full rounded-lg mt-2 p-5 gap-5 items-center">
                   <img
                     src={deleteOne.avatar_url || "/default-avatar.png"}
-                    alt={deleteOne.username}
-                    className="w-[145px] h-[205px] object-cover rounded"
+                    className="w-[60px] h-[60px] object-cover rounded"
                   />
-                  <div className="flex flex-col gap-3 w-full">
-                    <p>ID: {deleteOne.id}</p>
+                  <div className="flex flex-col">
                     <p className="font-bold">{deleteOne.username}</p>
-                    <p>Email: {deleteOne.email || "N/A"}</p>
-                    <p>Số điện thoại: {deleteOne.phone || "N/A"}</p>
-                    <p>Vai trò: {deleteOne.role || "USER"}</p>
+                    <p className="text-sm text-gray-500">ID: {deleteOne.id}</p>
                   </div>
                 </div>
                 <div className="flex justify-end mt-4 gap-4">
-                  <Button
-                    className="bg-gray-500 hover:bg-gray-700 text-white cursor-pointer"
-                    onClick={() => setPopUpOpen(false)}
-                  >
-                    Hủy
-                  </Button>
-                  <Button
-                    className="bg-red-500 hover:bg-red-700 text-white cursor-pointer"
-                    onClick={() => handleDelete(deleteOne)}
-                  >
-                    Xóa
-                  </Button>
+                  <Button className="bg-gray-500 text-white" onClick={() => setPopUpOpen(false)}>Hủy</Button>
+                  <Button className="bg-red-500 text-white" onClick={() => handleDelete(deleteOne)}>Xóa</Button>
                 </div>
               </div>
             </div>

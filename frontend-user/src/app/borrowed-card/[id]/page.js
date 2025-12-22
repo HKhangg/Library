@@ -1,12 +1,16 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
 import LeftSideBar from "@/app/components/LeftSideBar";
 import ChatBotButton from "../../components/ChatBoxButton";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import axios from "axios";
 import { ThreeDot } from "react-loading-indicators";
+import { Trash2, AlertTriangle } from "lucide-react";
+import useSWR, { mutate } from "swr";
+
+const fetcher = (url) => axios.get(url).then((res) => res.data);
 
 const BookCard = ({
   imageSrc,
@@ -49,7 +53,6 @@ const BorrowingInfo = ({ info }) => {
     <section className=" flex flex-col p-5 bg-white rounded-xl shadow-[0px_4px_4px_rgba(0,0,0,0.25)] max-md:px-5 max-md:max-w-full">
       <div className="grid grid-cols-2 gap-5 max-md:grid-cols-1">
         {/* Cột 1 */}
-
         <div className="flex flex-col gap-5 items-start text-[1.125rem] font-medium text-black">
           <p className="text-[1rem] font-semibold text-[#131313]/50">
             ID Phiếu:{" "}
@@ -102,40 +105,47 @@ const BorrowingInfo = ({ info }) => {
 
 const ChiTietPhieuMuon = () => {
   const { id } = useParams();
-  const [borrowDetail, setBorrowDetail] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [popUpOpen, setPopUpOpen] = useState(false);
-  const [deleteOne, setDeleteOne] = useState(null);
   const router = useRouter();
+  const [popUpOpen, setPopUpOpen] = useState(false);
+  const [user, setUser] = useState(null);
+
   useEffect(() => {
-    const fetchBorrowCardDetail = async () => {
-      try {
-        const response = await axios.get(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/borrow-cards/${id}`
-        );
-        setBorrowDetail(response.data);
-        console.log(response.data);
-      } catch (error) {
-        console.error("Lỗi khi fetch chi tiết phiếu mượn:", error);
-        toast.error("Không thể tải dữ liệu phiếu mượn");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchBorrowCardDetail();
-  }, [id]);
+    const storedUser = JSON.parse(localStorage.getItem("persist:root"));
+    setUser(storedUser);
+  }, []);
+
+  const {
+    data: borrowDetail,
+    isLoading: loading,
+    error,
+  } = useSWR(
+    id ? `${process.env.NEXT_PUBLIC_API_URL}/api/borrow-cards/${id}` : null,
+    fetcher
+  );
 
   const handleDelete = async (info) => {
+    if (!info || !info.id) {
+      toast.error("Lỗi: Không tìm thấy thông tin phiếu mượn.");
+      return;
+    }
+
+    const toastId = toast.loading("Đang xóa phiếu mượn...");
     try {
       await axios.delete(
-        `http://localhost:8081/borrow-card/${info.borrowCardId}`
+        `${process.env.NEXT_PUBLIC_API_URL}/api/borrow-cards/${info.id}`
       );
-      toast.success("Xóa phiếu thành công");
+      toast.success("Xóa phiếu thành công", { id: toastId });
       setPopUpOpen(false);
+
+      if (user?.id) {
+        mutate(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/borrow-cards/user/${user.id}`
+        );
+      }
 
       router.push("/borrowed-card");
     } catch (err) {
-      toast.error("Xóa phiếu thất bại");
+      toast.error("Xóa phiếu thất bại", { id: toastId });
     }
   };
 
@@ -159,10 +169,12 @@ const ChiTietPhieuMuon = () => {
     );
   }
 
-  if (!borrowDetail) {
+  if (error || !borrowDetail) {
     return (
-      <div className="md:ml-60 top-16 justify-center items-center">
-        Không tìm thấy phiếu mượn!
+      <div className="md:ml-60 pt-20 flex justify-center items-center">
+        <p className="text-red-500 font-bold">
+          Không tìm thấy phiếu mượn hoặc có lỗi xảy ra!
+        </p>
       </div>
     );
   }
@@ -173,16 +185,18 @@ const ChiTietPhieuMuon = () => {
         <LeftSideBar />
         <section className="self-stretch pr-[1.25rem] md:pl-60 ml-[1.25rem] my-auto w-full max-md:max-w-full mt-2 mb-2">
           <div className="flex flex-col w-full max-md:max-w-full">
+            {/* Nút Xóa */}
             <Button
               className="flex self-end text-[1rem] cursor-pointer bg-red-500 hover:bg-red-700 text-white w-fit mb-2"
               onClick={() => setPopUpOpen(true)}
             >
-              <img src="/icon/trash.svg" alt="Delete" className="mr-2" />
+              <Trash2 className="mr-2 h-4 w-4" />
               Xóa
             </Button>
+
             <BorrowingInfo info={borrowDetail} />
 
-            <h2 className="text-lg font-medium text-[#062D76] text-center mt-5 ">
+            <h2 className="text-lg font-medium text-[#062D76] dark:text-white text-center mt-5 ">
               Danh sách sách mượn
             </h2>
             <section className="grid grid-cols-1 max-sm:grid-cols-1 gap-5 items-start mt-2 w-full max-md:max-w-full">
@@ -201,16 +215,14 @@ const ChiTietPhieuMuon = () => {
           </div>
         </section>
         <ChatBotButton />
+
+        {/* Modal xác nhận xóa */}
         {popUpOpen && (
           <div className="fixed inset-0 items-center justify-center z-100 flex">
             <div className="w-full h-full bg-black opacity-[80%] absolute top-0 left-0"></div>
             <div className="flex flex-col justify-center self-center bg-white p-6 rounded-lg shadow-lg w-auto fixed">
-              <img
-                src="/icon/canh_bao.svg"
-                alt="Delete"
-                className="mb-2 w-8 h-8 self-center"
-              />
-              <p className="flex justify-center">
+              <AlertTriangle className="mb-2 w-8 h-8 self-center text-red-500" />
+              <p className="flex justify-center dark:text-[#062D76]">
                 Bạn có chắc chắn muốn xóa phiếu này không?
               </p>
 

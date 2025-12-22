@@ -1,147 +1,159 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import axios from "axios";
 import Sidebar from "../components/sidebar/Sidebar";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { useRouter } from "next/navigation";
 import { List, Pencil, Plus, Search, Trash2 } from "lucide-react";
-import toast from "react-hot-toast";
+import toast, { Toaster } from "react-hot-toast";
 import { ThreeDot } from "react-loading-indicators";
 
+import useSWR, { mutate } from "swr";
+import { fetcher } from "@/lib/fetcher";
+
 const Page = () => {
+  // State tìm kiếm và lọc
   const [searchQuery, setSearchQuery] = useState("");
-  const [mode, setMode] = useState("all"); // search mode
-  const [statusFilter, setStatusFilter] = useState("all"); // new dropdown filter
-  const [bookList, setBookList] = useState([]);
-  const [filterBooks, setFilterBooks] = useState([]);
+  const [mode, setMode] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+
+  // State UI
   const [popUpOpen, setPopUpOpen] = useState(false);
   const [deleteOne, setDeleteOne] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1); // Current page state
-  const [itemsPerPage] = useState(10); // Number of books per page
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
   const router = useRouter();
 
-  const fetchBook = async () => {
-    setLoading(true);
-    try {
-      const res = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/book`
-      );
-      setBookList(res.data);
-    } catch (error) {
-      toast.error("Lỗi khi lấy dữ liệu sách");
-      console.error(error);
-    } finally {
-      setLoading(false);
+  // State URL cho SWR
+  // Mặc định load tất cả sách
+  const [apiUrl, setApiUrl] = useState(`${process.env.NEXT_PUBLIC_API_URL}/api/book`);
+
+  // useSWR: Fetch dữ liệu sách
+  const { data: booksData = [], isLoading, error } = useSWR(
+    apiUrl,
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      dedupingInterval: 60000, // Cache 1 phút
+      keepPreviousData: true, 
+      onError: () => toast.error("Không thể tải danh sách sách"),
     }
-  };
+  );
 
-  useEffect(() => {
-    fetchBook();
-  }, []);
+  // Đảm bảo dữ liệu luôn là mảng
+  const safeBookList = Array.isArray(booksData) ? booksData : [];
 
-  useEffect(() => {
-    setSearchQuery("");
-    setFilterBooks([]);
-    setCurrentPage(1); // Reset to first page when mode changes
-  }, [mode]);
+  // Xử lý Search
+  const handleSearch = (e) => {
+    e?.preventDefault();
+    setCurrentPage(1); // Reset về trang 1
 
-  const handleSearch = async (e) => {
-    e.preventDefault();
-    if (mode === "all" && !searchQuery) {
-      setFilterBooks([]);
-      setCurrentPage(1); // Reset to first page
+    // Nếu mode 'all' và không có từ khóa -> Load lại tất cả
+    if (mode === "all" && !searchQuery.trim()) {
+      setApiUrl(`${process.env.NEXT_PUBLIC_API_URL}/api/book`);
       return;
     }
+
+    // Nếu mode 'all' nhưng không nhập gì -> Reset
     if (mode === "all") {
-      setFilterBooks(bookList);
-      setCurrentPage(1); // Reset to first page
+      setApiUrl(`${process.env.NEXT_PUBLIC_API_URL}/api/book`);
       return;
     }
+
+    // Xây dựng params tìm kiếm
     const params = {};
-    if (mode === "title") params.title = searchQuery;
-    else if (mode === "author") params.author = searchQuery;
-    else if (mode === "category") params.category = searchQuery;
-    else if (mode === "publisher") params.publisher = searchQuery;
+    if (mode === "title") params.title = searchQuery.trim();
+    else if (mode === "author") params.author = searchQuery.trim();
+    else if (mode === "category") params.category = searchQuery.trim();
+    else if (mode === "publisher") params.publisher = searchQuery.trim();
     else if (mode === "year") {
-      if (/^\d{4}$/.test(searchQuery.trim()))
+      if (/^\d{4}$/.test(searchQuery.trim())) {
         params.year = Number(searchQuery.trim());
-      else return alert("Nhập năm theo dạng YYYY");
+      } else {
+        toast.error("Nhập năm theo dạng YYYY");
+        return;
+      }
     }
-    try {
-      const { data } = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/book/search`,
-        { params }
-      );
-      setFilterBooks(data);
-      setCurrentPage(1); // Reset to first page
-      if (data.length === 0) toast.error("Không tìm thấy kết quả");
-    } catch (err) {
-      console.error("Lỗi khi tìm kiếm:", err);
-      toast.error("Có lỗi xảy ra khi tìm kiếm");
-    }
+
+    // Tạo Query String
+    const queryString = new URLSearchParams(params).toString();
+    setApiUrl(`${process.env.NEXT_PUBLIC_API_URL}/api/book/search?${queryString}`);
   };
 
+  // Xử lý xóa -> giữ logic check sách con + thêm toast loading + mutate)
   const handleDelete = async (book) => {
-    setLoading(true);
+    const toastId = toast.loading("Đang kiểm tra và xóa sách...");
+
     try {
+      // Kiểm tra sách con 
       const { data } = await axios.get(
         `${process.env.NEXT_PUBLIC_API_URL}/api/book/${book.maSach}`
       );
       const children = data.children || [];
       const hasBorrowed = children.some((c) => c.status === "BORROWED");
+
       if (hasBorrowed) {
-        toast.error("Không thể xoá: vẫn còn sách con đang được mượn!");
+        toast.error("Không thể xoá: vẫn còn sách con đang được mượn!", { id: toastId });
         return;
       }
+
+      // Xóa sách
       await axios.delete(
         `${process.env.NEXT_PUBLIC_API_URL}/api/book/${book.maSach}`
       );
-      toast.success("Xóa sách thành công");
-      await fetchBook();
-      setCurrentPage(1); // Reset to first page after deletion
+
+      // Cập nhật SWR (Optimistic UI Update hoặc Refetch)
+      mutate(
+        apiUrl,
+        (currentData) => currentData.filter((b) => b.maSach !== book.maSach),
+        false // false = không fetch lại ngay
+      );
+
+      toast.success("Xóa sách thành công", { id: toastId });
+
+      // Reset trang nếu trang hiện tại hết dữ liệu
+      if (currentBooks.length === 1 && currentPage > 1) {
+        setCurrentPage(currentPage - 1);
+      }
+
     } catch (error) {
-      console.error("Lỗi khi xóa:", error.response || error);
-      toast.error("Xóa sách thất bại");
+      console.error("Lỗi khi xóa:", error);
+      toast.error("Xóa sách thất bại", { id: toastId });
     } finally {
-      setLoading(false);
       setPopUpOpen(false);
       setDeleteOne(null);
     }
   };
 
-  // Calculate displayed books based on pagination
-  const displayedBooks = (
-    filterBooks.length > 0 ? filterBooks : bookList
-  ).filter((b) => {
-    if (statusFilter === "all") return true;
-    return b.trangThai === statusFilter;
-  });
+  // Xử lý phân trang 
+  // Lọc theo dropdown trạng thái
+  const filteredByStatus = useMemo(() => {
+    if (statusFilter === "all") return safeBookList;
+    return safeBookList.filter((b) => b.trangThai === statusFilter);
+  }, [safeBookList, statusFilter]);
 
-  // Calculate total pages
-  const totalPages = Math.ceil(displayedBooks.length / itemsPerPage);
-
-  // Get books for the current page
+  // Phân trang
+  const totalPages = Math.ceil(filteredByStatus.length / itemsPerPage) || 1;
   const indexOfLastBook = currentPage * itemsPerPage;
   const indexOfFirstBook = indexOfLastBook - itemsPerPage;
-  const currentBooks = displayedBooks.slice(indexOfFirstBook, indexOfLastBook);
+  const currentBooks = filteredByStatus.slice(indexOfFirstBook, indexOfLastBook);
 
-  // Handle page change
   const handlePageChange = (pageNumber) => {
     if (pageNumber >= 1 && pageNumber <= totalPages) {
       setCurrentPage(pageNumber);
     }
   };
 
+  // Component UI Cards
   const BookCard = ({ book }) => {
-    const isAvailable = book.trangThai === "CON_SAN";
     return (
       <div className="flex bg-white w-full rounded-lg mt-2 p-5 gap-5 md:gap-10 drop-shadow-lg items-center">
         <img
           src={book.hinhAnh?.[0] || "/placeholder.png"}
-          className="w-[145px] h-[205px] object-cover"
+          className="w-[145px] h-[205px] object-cover rounded"
+          onError={(e) => (e.target.src = "/placeholder.png")}
         />
         <div className="flex flex-col gap-2 w-full">
           <p className="font-bold">{book.tenSach}</p>
@@ -156,15 +168,15 @@ const Page = () => {
                 book.trangThai === "DA_XOA"
                   ? "text-red-500"
                   : book.trangThai === "DA_HET"
-                  ? "text-[#5C4033]"
-                  : "text-green-600"
+                    ? "text-[#5C4033]"
+                    : "text-green-600"
               }
             >
               {book.trangThai === "DA_XOA"
                 ? "Đã xóa"
                 : book.trangThai === "DA_HET"
-                ? "Đã hết"
-                : "Còn sẵn"}
+                  ? "Đã hết"
+                  : "Còn sẵn"}
             </span>
           </p>
           <div className="flex justify-end gap-5 md:gap-10">
@@ -200,7 +212,6 @@ const Page = () => {
     );
   };
 
-  // Generate page numbers for pagination
   const pageNumbers = [];
   for (let i = 1; i <= totalPages; i++) {
     pageNumbers.push(i);
@@ -208,8 +219,9 @@ const Page = () => {
 
   return (
     <div className="flex flex-row w-full min-h-screen bg-[#EFF3FB]">
+      <Toaster position="top-center" reverseOrder={false} />
       <Sidebar />
-      {loading ? (
+      {isLoading ? (
         <div className="flex md:ml-52 w-full h-screen justify-center items-center">
           <ThreeDot
             color="#062D76"
@@ -223,10 +235,11 @@ const Page = () => {
         <div className="flex w-full flex-col py-6 md:ml-52 gap-2 items-center px-10 mt-5">
           <div className="flex w-full items-center justify-between mb-10">
             <div className="flex gap-2 p-2 rounded-md w-full max-w-5xl items-center">
+              {/* Select Search Mode */}
               <select
                 onChange={(e) => setMode(e.target.value)}
                 value={mode}
-                className="border border-gray-300 bg-gray rounded-md shadow p-2 font-thin italic"
+                className="border border-gray-300 bg-gray rounded-md shadow p-2 font-thin italic h-10"
               >
                 <option value="all">Tất cả</option>
                 <option value="title">Tên sách</option>
@@ -235,23 +248,33 @@ const Page = () => {
                 <option value="publisher">Nhà xuất bản</option>
                 <option value="year">Năm xuất bản</option>
               </select>
+
+              {/* Input Search */}
               <Input
                 type="text"
                 placeholder="Tìm kiếm..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSearch(e)}
                 className="flex-1 h-10 p-3 text-black bg-white shadow font-thin italic"
               />
+
+              {/* Status Filter (Client-side) */}
               <select
-                onChange={(e) => setStatusFilter(e.target.value)}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value);
+                  setCurrentPage(1);
+                }}
                 value={statusFilter}
-                className="border border-gray-300 bg-white rounded-md shadow p-2 italic"
+                className="border border-gray-300 bg-white rounded-md shadow p-2 italic h-10"
               >
                 <option value="all">Tất cả trạng thái</option>
                 <option value="CON_SAN">Còn sẵn</option>
                 <option value="DA_HET">Đã hết</option>
                 <option value="DA_XOA">Đã xóa</option>
               </select>
+
+              {/* Search Button */}
               <Button
                 onClick={handleSearch}
                 className="w-10 h-10 bg-[#062D76] hover:bg-gray-700 shadow rounded-md"
@@ -259,6 +282,8 @@ const Page = () => {
                 <Search className="w-5 h-5" color="white" />
               </Button>
             </div>
+
+            {/* Action Buttons */}
             <div className="flex gap-4 ml-5">
               <Button
                 onClick={() => router.push("/books/categories")}
@@ -275,9 +300,16 @@ const Page = () => {
               </Button>
             </div>
           </div>
-          {currentBooks.map((book) => (
-            <BookCard key={book.maSach} book={book} />
-          ))}
+
+          {/* Book List */}
+          {currentBooks.length > 0 ? (
+            currentBooks.map((book) => (
+              <BookCard key={book.maSach} book={book} />
+            ))
+          ) : (
+            <p className="text-gray-500 mt-10">Không tìm thấy sách nào phù hợp.</p>
+          )}
+
           {/* Pagination Controls */}
           {totalPages > 1 && (
             <div className="flex justify-center items-center gap-2 mt-6">
@@ -292,11 +324,10 @@ const Page = () => {
                 <Button
                   key={number}
                   onClick={() => handlePageChange(number)}
-                  className={`${
-                    currentPage === number
+                  className={`${currentPage === number
                       ? "bg-[#062D76] text-white"
                       : "bg-white text-[#062D76] border border-[#062D76] hover:bg-gray-100"
-                  }`}
+                    }`}
                 >
                   {number}
                 </Button>
@@ -312,6 +343,8 @@ const Page = () => {
           )}
         </div>
       )}
+
+      {/* Delete Confirmation Modal */}
       {popUpOpen && deleteOne && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black opacity-80"></div>

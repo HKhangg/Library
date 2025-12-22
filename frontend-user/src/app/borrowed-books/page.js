@@ -30,13 +30,12 @@ const BorrowedPage = () => {
   useEffect(() => {
     const fetchBorrowed = async () => {
       try {
-        // Gọi endpoint trả về BookChild có status BORROWED
         const { data: children } = await axios.get(
           `${process.env.NEXT_PUBLIC_API_URL}/api/bookchild/borrowed`
         );
         // Map ra thông tin cần hiển thị
         const list = children.map((c) => {
-          const b = c.book; // object Book parent
+          const b = c.book; 
           // Tính trạng thái parent (còn sách hay hết) nếu cần
           const available =
             b.tongSoLuong - b.soLuongMuon - (b.soLuongXoa || 0) > 0;
