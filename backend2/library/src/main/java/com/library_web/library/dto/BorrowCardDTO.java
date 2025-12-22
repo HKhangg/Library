@@ -3,7 +3,6 @@ package com.library_web.library.dto;
 import java.time.LocalDateTime;
 import java.util.List;
 
-
 public class BorrowCardDTO {
   private Long id;
   private Long userId;
@@ -16,7 +15,6 @@ public class BorrowCardDTO {
   private int totalBooks;
   private Long maSach;
   private String tenSach;
-
 
   public BorrowCardDTO() {
   }
@@ -121,7 +119,6 @@ public class BorrowCardDTO {
     this.tenSach = tenSach;
   }
 
-
   public static class BookInfo {
     private String image;
     private String name;
@@ -191,13 +188,14 @@ public class BorrowCardDTO {
     }
 
     public BookInfo(String image, String bookName, String authorName, String categoryName, String publisher,
-        Integer borrowQuantity) {
+        Integer borrowQuantity, Long bookId) {
       this.image = image;
       this.name = bookName;
       this.author = authorName;
       this.category = categoryName;
       this.publisher = publisher;
       this.borrowCount = (borrowQuantity != null) ? borrowQuantity : 0;
+      this.maSach = bookId;
     }
   }
 }
