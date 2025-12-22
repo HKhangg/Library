@@ -2,7 +2,7 @@ import React from "react";
 
 const ServiceHoursCard = () => {
   return (
-    <article className="flex flex-col p-5 rounded-xl bg-blue-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 shadow-md hover:shadow-xl transition-all duration-300 w-[750px] h-[500px]">
+    <article className="flex flex-col p-5 rounded-xl bg-blue-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 shadow-md hover:shadow-xl transition-all duration-300 w-full h-full min-h-0">
       <h2 className="px-5 py-2.5 text-center text-lg font-bold text-white dark:text-white bg-[#9ce5f4] rounded-lg">
         Thời gian phục vụ
       </h2>
