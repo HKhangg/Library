@@ -7,9 +7,12 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 
 @Entity
 public class BookChild {
-    
+
     @Id
-    private String id; 
+    private String id;
+
+    @Column(nullable = false, unique = true)
+    private String barcode;
 
     @Enumerated(EnumType.STRING)
     private Status status = Status.AVAILABLE;
@@ -21,53 +24,79 @@ public class BookChild {
     @JsonIgnore
     private Book book;
 
-    public enum Status { AVAILABLE, BORROWED, NOT_AVAILABLE }
+    public enum Status {
+        AVAILABLE, BORROWED, NOT_AVAILABLE
+    }
 
-    public BookChild() {}
+    public BookChild() {
+    }
+
     public BookChild(Book book, String suffix) {
         this.id = book.getMaSach() + suffix;
+        this.barcode = this.id; // Tự động tạo barcode = id
         this.book = book;
         this.addedDate = LocalDate.now();
         this.status = Status.AVAILABLE;
     }
+
+    public String getBarcode() {
+        return barcode;
+    }
+
+    public void setBarcode(String barcode) {
+        this.barcode = barcode;
+    }
+
     public String getId() {
-        return id; 
+        return id;
     }
+
     public Status getStatus() {
-        return status; 
+        return status;
     }
+
     public void setStatus(Status status) {
-        this.status = status; 
+        this.status = status;
     }
+
     public LocalDate getAddedDate() {
-        return addedDate; 
+        return addedDate;
     }
-    public void setAddedDate(LocalDate addedDate) { 
-        this.addedDate = addedDate; 
+
+    public void setAddedDate(LocalDate addedDate) {
+        this.addedDate = addedDate;
     }
+
     public Book getBook() {
-        return book; 
+        return book;
     }
+
     public void setBook(Book book) {
-        this.book = book; 
+        this.book = book;
     }
 
     public boolean isAvailable() {
-        return status == Status.AVAILABLE; 
+        return status == Status.AVAILABLE;
     }
+
     public void borrow() {
-        if (status != Status.AVAILABLE) throw new IllegalStateException("Không thể mượn");
+        if (status != Status.AVAILABLE)
+            throw new IllegalStateException("Không thể mượn");
         status = Status.BORROWED;
         book.onBorrow();
     }
+
     public void returnBack() {
-        if (status != Status.BORROWED) throw new IllegalStateException("Không thể trả");
+        if (status != Status.BORROWED)
+            throw new IllegalStateException("Không thể trả");
         status = Status.AVAILABLE;
         book.onReturn();
     }
+
     public void markNotAvailable() {
-        if (status == Status.NOT_AVAILABLE) throw new IllegalStateException("Đã là NOT_AVAILABLE");
+        if (status == Status.NOT_AVAILABLE)
+            throw new IllegalStateException("Đã là NOT_AVAILABLE");
         status = Status.NOT_AVAILABLE;
     }
-    
+
 }
