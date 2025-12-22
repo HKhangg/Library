@@ -25,30 +25,30 @@ import java.util.*;
 @Service
 public class UploadService {
 
-@Autowired
-  private Cloudinary cloudinary;
+    @Autowired
+    private Cloudinary cloudinary;
 
-  public ResponseEntity<?> uploadImages(MultipartFile[] files) {
-    try {
-      List<String> urls = new ArrayList<>();
+    public ResponseEntity<?> uploadImages(MultipartFile[] files) {
+        try {
+            List<String> urls = new ArrayList<>();
 
-      for (MultipartFile file : files) {
-        System.out.println("==> Received:");
-        System.out.println("Name: " + file.getOriginalFilename());
-        System.out.println("Size: " + file.getSize() + " bytes");
+            for (MultipartFile file : files) {
+                System.out.println("==> Received:");
+                System.out.println("Name: " + file.getOriginalFilename());
+                System.out.println("Size: " + file.getSize() + " bytes");
 
-        @SuppressWarnings("unchecked")
-        Map<String, Object> uploadResult = (Map<String, Object>) cloudinary.uploader()
-            .upload(file.getBytes(), ObjectUtils.emptyMap());
+                @SuppressWarnings("unchecked")
+                Map<String, Object> uploadResult = (Map<String, Object>) cloudinary.uploader()
+                        .upload(file.getBytes(), ObjectUtils.emptyMap());
 
-        urls.add((String) uploadResult.get("secure_url"));
-      }
+                urls.add((String) uploadResult.get("secure_url"));
+            }
 
-      return ResponseEntity.ok(urls);
-    } catch (IOException e) {
-      return ResponseEntity.badRequest().body(Map.of("error", "Lỗi upload ảnh: " + e.getMessage()));
+            return ResponseEntity.ok(urls);
+        } catch (IOException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Lỗi upload ảnh: " + e.getMessage()));
+        }
     }
-  }
 
     public ResponseEntity<?> uploadBarcode(MultipartFile file, String type) {
         if (file.isEmpty()) {
@@ -149,7 +149,9 @@ public class UploadService {
     }
 
     private ResponseEntity<?> handleDecodedResult(String decodedText, String type) {
-        if (!decodedText.matches("^[a-fA-F0-9]{24}$")) {
+        // ✅ Không cần kiểm tra format cụ thể, vì barcode có thể là "LIB00000001"
+        // Chỉ kiểm tra không rỗng
+        if (decodedText == null || decodedText.trim().isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("error", "Mã không hợp lệ", "raw", decodedText));
         }
 
@@ -157,28 +159,22 @@ public class UploadService {
             RestTemplate restTemplate = new RestTemplate();
 
             if (type.equals("book")) {
-                String apiUrl = "http://localhost:8080/api/bookchild/" + decodedText;
-                ResponseEntity<BookChild> response = restTemplate.getForEntity(apiUrl, BookChild.class);
+                // ✅ SỬA: Gọi API tìm theo barcode thay vì id
+                String apiUrl = "http://localhost:8080/api/bookchild/barcode/" + decodedText;
+                ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
+                        apiUrl,
+                        HttpMethod.GET,
+                        null,
+                        new ParameterizedTypeReference<>() {
+                        });
+
                 if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
                     return ResponseEntity.status(404).body(Map.of("error", "Không tìm thấy sách con"));
                 }
 
-                BookChild child = response.getBody();
-                Map<String, Object> parentBook = null;
-
-                if (child != null && child.getBook() != null) {
-                    String parentUrl = "http://localhost:8080/api/book/" + child.getBook();
-                    ResponseEntity<Map<String, Object>> parentResponse = restTemplate.exchange(
-                            parentUrl,
-                            HttpMethod.GET,
-                            null,
-                            new ParameterizedTypeReference<>() {
-                            });
-                    parentBook = parentResponse.getBody();
-                }
-
-                return ResponseEntity.ok(Map.of("childBook", child, "parentBook", parentBook));
+                return ResponseEntity.ok(response.getBody());
             } else {
+                // User vẫn dùng ObjectId
                 String apiUrl = "http://localhost:8080/api/user/" + decodedText;
                 ResponseEntity<User> response = restTemplate.getForEntity(apiUrl, User.class);
                 return ResponseEntity.ok(response.getBody());
@@ -189,5 +185,4 @@ public class UploadService {
         }
     }
 
-   
 }
