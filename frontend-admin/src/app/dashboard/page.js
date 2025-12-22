@@ -1,10 +1,9 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState, useMemo } from "react";
 import { ThreeDot } from "react-loading-indicators";
 import Sidebar from "../components/sidebar/Sidebar";
-import StatisticsCard from "./StatisticsCard";
-import axios from "axios";
+// import StatisticsCard from "./StatisticsCard"; 
 import toast from "react-hot-toast";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
@@ -22,6 +21,8 @@ import {
   Legend,
 } from "chart.js";
 import { Bar, Line } from "react-chartjs-2";
+import useSWR from "swr";
+import { fetcher } from "@/lib/fetcher";
 
 ChartJS.register(
   CategoryScale,
@@ -35,17 +36,12 @@ ChartJS.register(
 );
 
 const Dashboard = () => {
-  const [totalBooks, setTotalBooks] = useState(0);
-  const [totalBookQuantity, setTotalBookQuantity] = useState(0);
-  const [newBooksThisMonth, setNewBooksThisMonth] = useState(0);
-  const [borrowedBooksThisMonth, setBorrowedBooksThisMonth] = useState(0);
-  const [monthlyStats, setMonthlyStats] = useState([]);
-  const [booksToRestock, setBooksToRestock] = useState([]);
-  const [allBooks, setAllBooks] = useState([]);
-  const [filteredBooks, setFilteredBooks] = useState([]);
+  // UI và phân trang
+  const [activeSection, setActiveSection] = useState("danhSach");
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
   const booksPerPage = 10;
+  const router = useRouter();
+
   const [searchParams, setSearchParams] = useState({
     author: "",
     category: "",
@@ -55,72 +51,52 @@ const Dashboard = () => {
     mode: "all",
     sortByBorrowCount: false,
   });
-  const [loading, setLoading] = useState(false);
-  const [activeSection, setActiveSection] = useState("danhSach"); // Default to "Danh sách các sách"
-  const router = useRouter();
 
-  // State for chart data
-  const [barChartData, setBarChartData] = useState({
-    labels: [],
-    datasets: [],
-  });
-  const [lineChartData, setLineChartData] = useState({
-    labels: [],
-    datasets: [],
-  });
+  // State URL cho SWR 
+  // Mặc định load tất cả sách
+  const [bookApiUrl, setBookApiUrl] = useState(
+    `${process.env.NEXT_PUBLIC_API_URL}/api/book`
+  );
 
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        const dashboardResponse = await axios.get(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/book/dashboard`,
-          { headers: { "Cache-Control": "no-cache" } }
-        );
+  // SWR: Lấy Thống kê Dashboard
+  const { data: dashboardData, isLoading: dashboardLoading } = useSWR(
+    `${process.env.NEXT_PUBLIC_API_URL}/api/book/dashboard`,
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      dedupingInterval: 60000, // Cache 1 phút
+    }
+  );
 
-        setTotalBooks(dashboardResponse.data.totalBooks || 0);
-        setTotalBookQuantity(dashboardResponse.data.totalBookQuantity || 0);
-        setNewBooksThisMonth(dashboardResponse.data.newBooksThisMonth || 0);
-        setBorrowedBooksThisMonth(
-          dashboardResponse.data.borrowedBooksThisMonth || 0
-        );
-        setMonthlyStats(dashboardResponse.data.monthlyStats || []);
-        setBooksToRestock(dashboardResponse.data.booksToRestock || []);
+  // SWR: Lấy Danh sách Sách 
+  const { data: booksData = [], isLoading: booksLoading } = useSWR(
+    bookApiUrl,
+    fetcher,
+    {
+      keepPreviousData: true, // Giữ data cũ khi đang search mới
+      revalidateOnFocus: false,
+    }
+  );
 
-        const booksResponse = await axios.get(
-// <<<<<<< thanhtri
-//           "http://localhost:8080/api/book",
-//           { headers: { "Cache-Control": "no-cache" } }
-// =======
-          `${process.env.NEXT_PUBLIC_API_URL}/api/book`,
-          {
-            headers: { "Cache-Control": "no-cache" },
-          }
+  // Xử lý dữ liệu biểu đồ
+  const { barChartData, lineChartData } = useMemo(() => {
+    if (!dashboardData) {
+      return {
+        barChartData: { labels: [], datasets: [] },
+        lineChartData: { labels: [], datasets: [] }
+      };
+    }
 
-        );
+    const {
+      totalBooks = 0,
+      totalBookQuantity = 0,
+      newBooksThisMonth = 0,
+      borrowedBooksThisMonth = 0,
+      monthlyStats = [],
+    } = dashboardData;
 
-        setAllBooks(booksResponse.data || []);
-        setFilteredBooks(booksResponse.data || []);
-        setTotalPages(Math.ceil(booksResponse.data.length / booksPerPage) || 1);
-        setCurrentPage(1);
-      } catch (error) {
-        console.error("Error fetching data:", error);
-        toast.error("Không thể tải dữ liệu.");
-        setAllBooks([]);
-        setFilteredBooks([]);
-        setTotalPages(1);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, []);
-
-  useEffect(() => {
-    console.log("monthlyStats:", monthlyStats); // Debug log to inspect the data
-    // Bar chart for absolute values
-    setBarChartData({
+    // Bar Chart Data
+    const barData = {
       labels: [
         "Tổng đầu sách",
         "Tổng số lượng sách",
@@ -130,12 +106,7 @@ const Dashboard = () => {
       datasets: [
         {
           label: "Số lượng",
-          data: [
-            totalBooks,
-            totalBookQuantity,
-            newBooksThisMonth,
-            borrowedBooksThisMonth,
-          ],
+          data: [totalBooks, totalBookQuantity, newBooksThisMonth, borrowedBooksThisMonth],
           backgroundColor: [
             "rgba(75, 192, 192, 0.6)",
             "rgba(255, 99, 132, 0.6)",
@@ -151,12 +122,13 @@ const Dashboard = () => {
           borderWidth: 1,
         },
       ],
-    });
+    };
 
-    // Line chart for percentage growth (if previous month data exists)
+    // Line Chart Data
+    let lineData = { labels: [], datasets: [] };
     if (monthlyStats.length >= 2) {
-      const prevMonth = monthlyStats[1]; // Previous month (May 2025)
-      const currMonth = monthlyStats[0]; // Current month (June 2025)
+      const prevMonth = monthlyStats[1];
+      const currMonth = monthlyStats[0];
 
       const prevNewBooks = Number(prevMonth.newBooks) || 0;
       const currNewBooks = Number(currMonth.newBooks) || 0;
@@ -171,7 +143,8 @@ const Dashboard = () => {
         prevBorrowedBooks > 0
           ? ((currBorrowedBooks - prevBorrowedBooks) / prevBorrowedBooks) * 100
           : 0;
-      setLineChartData({
+
+      lineData = {
         labels: ["Tháng này"],
         datasets: [
           {
@@ -191,81 +164,22 @@ const Dashboard = () => {
             fill: false,
           },
         ],
-      });
-    } else {
-      setLineChartData({ labels: [], datasets: [] });
+      };
     }
-  }, [
-    totalBooks,
-    totalBookQuantity,
-    newBooksThisMonth,
-    borrowedBooksThisMonth,
-    monthlyStats,
-  ]);
 
-  const fetchSearchResults = async (params) => {
-    setLoading(true);
-    try {
-      const queryParams = new URLSearchParams();
-      if (params.mode === "all" && params.title) {
-        queryParams.append("all", params.title.trim());
-      } else if (params.mode === "author" && params.author) {
-        queryParams.append("author", params.author.trim());
-      } else if (params.mode === "category" && params.category) {
-        queryParams.append("category", params.category.trim());
-      } else if (params.mode === "publisher" && params.publisher) {
-        queryParams.append("publisher", params.publisher.trim());
-      } else if (params.mode === "year" && params.year) {
-        if (/^\d{4}$/.test(params.year.trim())) {
-          queryParams.append("year", params.year.trim());
-        } else {
-          toast.error("Vui lòng nhập năm theo định dạng YYYY (VD: 2023)");
-          setLoading(false);
-          return;
-        }
-      } else if (params.mode === "title" && params.title) {
-        queryParams.append("title", params.title.trim());
-      } else {
-        setFilteredBooks(allBooks);
-        setTotalPages(Math.ceil(allBooks.length / booksPerPage) || 1);
-        setCurrentPage(1);
-        setLoading(false);
-        return;
-      }
-      queryParams.append("sortByBorrowCount", params.sortByBorrowCount);
+    return { barChartData: barData, lineChartData: lineData };
+  }, [dashboardData]);
 
-      const response = await axios.get(
-        `${
-          process.env.NEXT_PUBLIC_API_URL
-        }/api/book/search?${queryParams.toString()}`,
-        { headers: { "Cache-Control": "no-cache" } }
-      );
-      console.log("Search results:", response.data);
-      setFilteredBooks(response.data || []);
-      setTotalPages(Math.ceil(response.data.length / booksPerPage) || 1);
-      setCurrentPage(1);
-    } catch (error) {
-      console.error("Error fetching search results:", error);
-      toast.error("Không thể tìm kiếm sách.");
-      setFilteredBooks([]);
-      setTotalPages(1);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const paginatedBooks = filteredBooks.slice(
+  const safeBooks = Array.isArray(booksData) ? booksData : [];
+  const totalPages = Math.ceil(safeBooks.length / booksPerPage) || 1;
+  const paginatedBooks = safeBooks.slice(
     (currentPage - 1) * booksPerPage,
     currentPage * booksPerPage
   );
 
-  const handlePageChange = (page) => {
-    if (page >= 1 && page <= totalPages) {
-      console.log(`Navigating to page ${page}`);
-      setCurrentPage(page);
-    }
-  };
+  const booksToRestock = dashboardData?.booksToRestock || [];
 
+  // Handlers
   const handleSearchChange = (e) => {
     const { name, value, type, checked } = e.target;
     setSearchParams((prev) => ({
@@ -274,17 +188,61 @@ const Dashboard = () => {
     }));
   };
 
+  const handleSearchSubmit = (e) => {
+    e?.preventDefault();
+
+    const params = searchParams;
+    const queryParams = new URLSearchParams();
+
+    // Logic reset nếu tìm kiếm rỗng ở chế độ 'all'
+    if (params.mode === "all" && !params.title) {
+      setBookApiUrl(`${process.env.NEXT_PUBLIC_API_URL}/api/book`);
+      setCurrentPage(1);
+      return;
+    }
+
+    // Xây dựng query params
+    if (params.mode === "all" && params.title) {
+      queryParams.append("all", params.title.trim());
+    } else if (params.mode === "author" && params.author) {
+      queryParams.append("author", params.author.trim());
+    } else if (params.mode === "category" && params.category) {
+      queryParams.append("category", params.category.trim());
+    } else if (params.mode === "publisher" && params.publisher) {
+      queryParams.append("publisher", params.publisher.trim());
+    } else if (params.mode === "year" && params.year) {
+      if (/^\d{4}$/.test(params.year.trim())) {
+        queryParams.append("year", params.year.trim());
+      } else {
+        toast.error("Vui lòng nhập năm theo định dạng YYYY (VD: 2023)");
+        return;
+      }
+    } else if (params.mode === "title" && params.title) {
+      queryParams.append("title", params.title.trim());
+    } else {
+      // Trường hợp không khớp đk nào -> reset về all
+      setBookApiUrl(`${process.env.NEXT_PUBLIC_API_URL}/api/book`);
+      setCurrentPage(1);
+      return;
+    }
+
+    queryParams.append("sortByBorrowCount", params.sortByBorrowCount);
+
+    // Cập nhật URL -> SWR sẽ tự động fetch lại với URL mới
+    setBookApiUrl(`${process.env.NEXT_PUBLIC_API_URL}/api/book/search?${queryParams.toString()}`);
+    setCurrentPage(1);
+  };
+
   const handleKeyDown = (e) => {
     if (e.key === "Enter") {
-      e.preventDefault();
-      fetchSearchResults(searchParams);
+      handleSearchSubmit(e);
     }
   };
 
-  const handleSearchSubmit = (e) => {
-    e.preventDefault();
-    console.log("Search submitted with params:", searchParams);
-    fetchSearchResults(searchParams);
+  const handlePageChange = (page) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
   };
 
   const handleBookClick = (id, type) => {
@@ -298,8 +256,8 @@ const Dashboard = () => {
     pageNumbers.push(i);
   }
 
+  // Component con BookCard
   const BookCard = ({ book, onClick }) => {
-    const isAvailable = book.trangThai === "CON_SAN";
     return (
       <div
         className="flex bg-white w-full rounded-lg mt-2 p-5 gap-5 md:gap-10 drop-shadow-lg items-center cursor-pointer"
@@ -324,15 +282,15 @@ const Dashboard = () => {
                 book.trangThai === "DA_XOA"
                   ? "text-red-500"
                   : book.trangThai === "DA_HET"
-                  ? "text-yellow-600"
-                  : "text-green-600"
+                    ? "text-yellow-600"
+                    : "text-green-600"
               }
             >
               {book.trangThai === "DA_XOA"
                 ? "Đã xóa"
                 : book.trangThai === "DA_HET"
-                ? "Đã hết"
-                : "Còn sẵn"}
+                  ? "Đã hết"
+                  : "Còn sẵn"}
             </span>
           </p>
         </div>
@@ -340,10 +298,13 @@ const Dashboard = () => {
     );
   };
 
+  // Loading chung chỉ khi Dashboard chưa load xong (vì Books có thể load sau)
+  const isLoading = dashboardLoading;
+
   return (
     <div className="flex flex-row w-full min-h-screen bg-[#F4F7FE]">
       <Sidebar />
-      {loading ? (
+      {isLoading ? (
         <div className="flex md:ml-52 w-full h-screen justify-center items-center">
           <ThreeDot
             color="#062D76"
@@ -355,29 +316,7 @@ const Dashboard = () => {
         </div>
       ) : (
         <main className="self-stretch pr-[1.25rem] md:pl-52 ml-[1.25rem] my-auto w-full max-md:max-w-full py-[2rem]">
-          {/* <section className="grid lg:grid-cols-4 md:grid-cols-2 grid-cols-1 gap-4 justify-between items-center w-full leading-none text-white h-full max-md:max-w-full">
-            <StatisticsCard
-              icon="https://cdn.builder.io/api/v1/image/assets/TEMP/e444cbee3c99f14768fa6c876faa966d9bede995?placeholderIfAbsent=true&apiKey=d911d70ad43c41e78d81b9650623c816"
-              title="Tổng đầu sách"
-              value={totalBooks}
-            />
-            <StatisticsCard
-              title="Tổng số lượng sách"
-              value={totalBookQuantity}
-            />
-            <StatisticsCard
-              icon="https://cdn.builder.io/api/v1/image/assets/TEMP/70bb6ff8485146e65b19f58221ee1e5ce86c9519?placeholderIfAbsent=true&apiKey=d911d70ad43c41e78d81b9650623c816"
-              title="Sách mới tháng này"
-              value={newBooksThisMonth}
-            />
-            <StatisticsCard
-              icon="https://cdn.builder.io/api/v1/image/assets/TEMP/70bb6ff8485146e65b19f58221ee1e5ce86c9519?placeholderIfAbsent=true&apiKey=d911d70ad43c41e78d81b9650623c816"
-              title="Sách mượn tháng này"
-              value={borrowedBooksThisMonth}
-            />
-          </section> */}
-          
-
+          {/* Charts Section */}
           <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="bg-white p-6 rounded-lg shadow-lg" style={{ height: "400px" }}>
               <h2 className="text-xl font-semibold text-gray-800 mb-4">
@@ -394,11 +333,7 @@ const Dashboard = () => {
                       title: { display: true, text: "Số lượng theo tháng này" },
                     },
                     scales: {
-                      x: { title: { display: true, text: "Chỉ số" } },
-                      y: {
-                        title: { display: true, text: "Số lượng" },
-                        beginAtZero: true,
-                      },
+                      y: { beginAtZero: true },
                     },
                   }}
                 />
@@ -424,11 +359,7 @@ const Dashboard = () => {
                       },
                     },
                     scales: {
-                      x: { title: { display: true, text: "Thời gian" } },
-                      y: {
-                        title: { display: true, text: "% Tăng trưởng" },
-                        beginAtZero: true,
-                      },
+                      y: { beginAtZero: true },
                     },
                   }}
                 />
@@ -440,6 +371,7 @@ const Dashboard = () => {
             </div>
           </div>
 
+          {/* Search Controls */}
           <div className="flex gap-2 p-2 mt-8 rounded-md w-full items-center justify-center">
             <select
               name="mode"
@@ -461,14 +393,14 @@ const Dashboard = () => {
                 searchParams.mode === "title"
                   ? searchParams.title
                   : searchParams.mode === "author"
-                  ? searchParams.author
-                  : searchParams.mode === "category"
-                  ? searchParams.category
-                  : searchParams.mode === "publisher"
-                  ? searchParams.publisher
-                  : searchParams.mode === "year"
-                  ? searchParams.year
-                  : searchParams.title
+                    ? searchParams.author
+                    : searchParams.mode === "category"
+                      ? searchParams.category
+                      : searchParams.mode === "publisher"
+                        ? searchParams.publisher
+                        : searchParams.mode === "year"
+                          ? searchParams.year
+                          : searchParams.title
               }
               name={searchParams.mode !== "all" ? searchParams.mode : "title"}
               onChange={handleSearchChange}
@@ -493,32 +425,37 @@ const Dashboard = () => {
             </label>
           </div>
 
+          {/* List Section */}
           <div className="mt-6 w-full">
             <div className="flex gap-4 mb-6">
               <Button
                 onClick={() => setActiveSection("danhSach")}
-                className={`px-4 py-7 text-[1.25rem] text-white rounded-lg ${
-                  activeSection === "danhSach"
+                className={`px-4 py-7 text-[1.25rem] text-white rounded-lg ${activeSection === "danhSach"
                     ? "bg-[#062D76]"
                     : "bg-gray-300 hover:bg-gray-400"
-                }`}
+                  }`}
               >
                 Danh sách các sách
               </Button>
               <Button
                 onClick={() => setActiveSection("restock")}
-                className={`px-4 py-7 text-[1.25rem] text-white rounded-lg ${
-                  activeSection === "restock"
+                className={`px-4 py-7 text-[1.25rem] text-white rounded-lg ${activeSection === "restock"
                     ? "bg-[#062D76]"
                     : "bg-gray-300 hover:bg-gray-400"
-                }`}
+                  }`}
               >
                 Sách cần bổ sung ({booksToRestock.length})
               </Button>
             </div>
+
+            {/* Danh sách sách (Có loading riêng) */}
             {activeSection === "danhSach" && (
               <div className="w-full">
-                {paginatedBooks.length > 0 ? (
+                {booksLoading ? (
+                  <div className="flex w-full justify-center py-10">
+                    <ThreeDot color="#062D76" size="medium" text="Đang tải danh sách..." textColor="#062D76" />
+                  </div>
+                ) : paginatedBooks.length > 0 ? (
                   paginatedBooks.map((book) => (
                     <BookCard
                       key={book.maSach}
@@ -531,7 +468,8 @@ const Dashboard = () => {
                     Không tìm thấy sách phù hợp.
                   </p>
                 )}
-                {totalPages > 1 && (
+
+                {!booksLoading && totalPages > 1 && (
                   <div className="flex justify-center items-center gap-2 mt-6">
                     <Button
                       onClick={() => handlePageChange(currentPage - 1)}
@@ -544,11 +482,10 @@ const Dashboard = () => {
                       <Button
                         key={number}
                         onClick={() => handlePageChange(number)}
-                        className={`${
-                          currentPage === number
+                        className={`${currentPage === number
                             ? "bg-[#062D76] text-white"
                             : "bg-white text-[#062D76] border border-[#062D76] hover:bg-gray-100 cursor-pointer"
-                        }`}
+                          }`}
                       >
                         {number}
                       </Button>
@@ -564,6 +501,8 @@ const Dashboard = () => {
                 )}
               </div>
             )}
+
+            {/* Restock Section */}
             {activeSection === "restock" && (
               <div className="w-full">
                 {booksToRestock.length > 0 ? (
@@ -582,8 +521,6 @@ const Dashboard = () => {
               </div>
             )}
           </div>
-
-          
         </main>
       )}
     </div>

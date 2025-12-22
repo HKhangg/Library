@@ -25,7 +25,6 @@ function Page() {
         const fineData = response.data;
         setFine(fineData);
         // Nếu phiếu phạt liên quan đến sách, lấy thông tin sách
-        // console.log(fineData);
         if (
           fineData.noiDung == "Làm mất sách" ||
           fineData.noiDung == "Trả sách trễ hạn"
@@ -34,7 +33,6 @@ function Page() {
             fineData.cardId.borrowedBooks[0].bookId
           ); // Lấy thông tin sách từ cardId
           setBookInfo(bookData);
-          // console.log("Thông tin sách đã được cập nhật:", bookData);
         } else {
           setBookInfo(null); // Nếu không liên quan đến sách, đặt bookInfo là null
         }
@@ -101,7 +99,6 @@ function Page() {
     );
   };
 
-  // Hàm xử lý thanh toán
   const handleThanhToan = async () => {
     const response = await axios.post(
       `${process.env.NEXT_PUBLIC_API_URL}/api/fine/pay-momo/${fine.id}`
