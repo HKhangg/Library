@@ -1,8 +1,4 @@
 {
-<<<<<<< HEAD
-  "dependencies": {
-    "@zxing/browser": "^0.1.5"
-=======
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -12,6 +8,5 @@
     "@supabase/supabase-js": "^2.57.4",
     "lottie-react": "^2.4.1",
     "react-simple-typewriter": "^5.0.1"
->>>>>>> b103042731782b660e97c4e3606051c9eeeee410
   }
 }
