@@ -1,12 +1,13 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { Button } from "../components/ui/button";
 import { ThreeDot } from "react-loading-indicators";
 import toast from "react-hot-toast";
 import { format } from "date-fns";
-import { Book, CalendarClock, Undo2 } from "lucide-react";
+import { Book, CalendarClock, Undo2, Camera, QrCode, Scan } from "lucide-react";
 import UploadChild from "./childBook/page";
 import Link from "next/link";
+import CameraScanner from "./CameraScanner";
 
 const UploadImage = () => {
   const [selectedFile, setSelectedFile] = useState(null);
@@ -19,6 +20,10 @@ const UploadImage = () => {
   const [resultChild, setResultChild] = useState(null);
   const [done, setDone] = useState(false);
   const [children, setChildren] = useState([]);
+  const [showQRScanner, setShowQRScanner] = useState(false);
+  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
+  const lastFetchedUserId = useRef(null);
+  const isFetchingRef = useRef(false);
   // Hàm xử lý khi người dùng chọn ảnh
   const onFileChange = (event) => {
     setSelectedFile(event.target.files[0]);
@@ -77,20 +82,112 @@ const UploadImage = () => {
         setLoading(false);
         return;
       }
-      const result = await response.json();
-      console.log(result);
-      setResult(result);
+      const userData = await response.json();
+      console.log(userData);
+      setResult(userData);
       setText("");
+      
+      // Gọi fetchBorrowCardsForUser trực tiếp
+      await fetchBorrowCardsForUser(userData.id);
     } catch (e) {
       console.log(e);
+      setLoading(false);
     }
-    setLoading(false);
+  };
+
+  // Xử lý khi quét QR code thành công
+  const handleQRScanSuccess = async (decodedText, scanType) => {
+    console.log("QR Code scanned:", decodedText);
+    if (scanType === "qrcode") {
+      // Quét mã QR người dùng
+      setShowQRScanner(false);
+      setText(decodedText);
+      // Tự động tìm kiếm user
+      setLoading(true);
+      try {
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/user/${decodedText}`,
+          {
+            method: "GET",
+          }
+        );
+        if (!response.ok) {
+          window.alert("Không tìm thấy người dùng với ID: " + decodedText);
+          setLoading(false);
+          return;
+        }
+        const userData = await response.json();
+        setResult(userData);
+        toast.success("Quét mã QR thành công!");
+        
+        // Gọi getBorrowCard trực tiếp sau khi có user data
+        await fetchBorrowCardsForUser(userData.id);
+      } catch (e) {
+        console.log(e);
+        toast.error("Có lỗi xảy ra khi tìm kiếm người dùng");
+        setLoading(false);
+      }
+      // Không set loading = false ở đây vì fetchBorrowCardsForUser sẽ xử lý
+    }
+  };
+
+  // Xử lý khi quét barcode sách thành công
+  const handleBarcodeScanSuccess = async (decodedText, scanType) => {
+    console.log("Barcode scanned:", decodedText);
+    if (scanType === "barcode") {
+      setShowBarcodeScanner(false);
+      // Tìm sách con theo barcode
+      setLoading(true);
+      try {
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/bookchild/barcode/${decodedText}`,
+          {
+            method: "GET",
+          }
+        );
+        if (!response.ok) {
+          window.alert("Không tìm thấy sách với barcode: " + decodedText);
+          setLoading(false);
+          return;
+        }
+        const childBook = await response.json();
+        setResultChild(childBook);
+        toast.success("Quét barcode sách thành công!");
+        setLoading(false);
+      } catch (e) {
+        console.log(e);
+        toast.error("Có lỗi xảy ra khi tìm kiếm sách");
+        setLoading(false);
+      }
+    }
   };
   //hàm lấy phiếu mượn
-  const getBorrowCard = async () => {
+  const fetchBorrowCardsForUser = useCallback(async (userId) => {
+    console.log("🔍 fetchBorrowCardsForUser called with userId:", userId);
+    console.log("🔍 lastFetchedUserId.current:", lastFetchedUserId.current);
+    console.log("🔍 isFetchingRef.current:", isFetchingRef.current);
+    
+    if (!userId) {
+      console.log("❌ No userId provided");
+      return;
+    }
+    
+    // Kiểm tra xem đang fetch hay đã fetch cho userId này chưa
+    if (isFetchingRef.current) {
+      console.log("⏳ Already fetching, skipping...");
+      return;
+    }
+    
+    if (lastFetchedUserId.current === userId) {
+      console.log("✅ Already fetched borrow cards for user", userId);
+      return;
+    }
+    
+    console.log("🚀 Fetching borrow cards for user", userId);
+    isFetchingRef.current = true;
+    lastFetchedUserId.current = userId;
     setLoading(true);
     try {
-      const userId = result?.id;
       var response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/api/borrow-cards/user/${userId}`,
         {
@@ -110,16 +207,12 @@ const UploadImage = () => {
       const res = await response.json();
       setBorrowCard(res);
     } catch (e) {
-      console.log("Lỗi khi tìm phiếu mượn của user ", result?.id, ": ", e);
+      console.log("Lỗi khi tìm phiếu mượn của user ", userId, ": ", e);
+    } finally {
+      isFetchingRef.current = false;
+      setLoading(false);
     }
-    setLoading(false);
-  };
-  useEffect(() => {
-    if (result) {
-      getBorrowCard();
-    }
-  }, [result]);
-
+  }, []); // Empty dependency array - hàm này không bị tạo lại
   const fetchBookInfo = async (bookId) => {
     const res = await fetch(
       `${process.env.NEXT_PUBLIC_API_URL}/api/book/${bookId}`
@@ -177,6 +270,7 @@ const UploadImage = () => {
     setText("");
     setLoading(false);
     setBorrowCard(null);
+    lastFetchedUserId.current = null;
   };
   const BookInfo = ({ book }) => {
     return (
@@ -249,49 +343,90 @@ const UploadImage = () => {
         const foundBook = currentInfo.find((book) => book.maSach === parentId);
         if (!foundBook) {
           window.alert("Sách cha không tồn tại trong danh sách!");
+          setResultChild(null); // Reset sau khi xử lý
           return;
         }
         if (foundBook.checked) {
           window.alert("Sách cha đã được chọn!");
+          setResultChild(null); // Reset sau khi xử lý
           return;
         }
         const updatedBooks = currentInfo.map((book) =>
           book.maSach === parentId ? { ...book, checked: true } : book
         );
         setInfo(updatedBooks);
-        children.push(resultChild.id);
+        // Push barcode thay vì id vì backend cần barcode
+        children.push(resultChild.barcode);
+        setResultChild(null); // Reset sau khi xử lý thành công
       } else {
+        // Trả sách - so sánh với childBookId (là String)
         const childId = resultChild.id;
-        console.log("tới đay");
+        console.log("Tìm sách con với ID:", childId);
+        console.log("Danh sách sách hiện tại:", currentInfo);
+        
+        // ✅ Kiểm tra currentInfo có null không
+        if (!currentInfo || !Array.isArray(currentInfo)) {
+          console.error("currentInfo không hợp lệ:", currentInfo);
+          window.alert("Danh sách sách không hợp lệ!");
+          return;
+        }
+        
         const foundBook = currentInfo.find(
-          (book) => book.childId.childBookId === childId
+          (book) => {
+            // childId có thể là object hoặc string
+            const bookChildId = typeof book.childId === 'object' 
+              ? book.childId?.childBookId 
+              : book.childId;
+            console.log("So sánh:", bookChildId, "===", childId);
+            return bookChildId === childId || bookChildId === String(childId);
+          }
         );
+        
         if (!foundBook) {
+          console.error("Không tìm thấy sách với childBookId:", childId);
           window.alert("Sách không tồn tại trong danh sách đã mượn!");
+          setResultChild(null); // Reset sau khi xử lý
           return;
         }
         if (foundBook.checked) {
           window.alert("Sách này đã được chọn!");
+          setResultChild(null); // Reset sau khi xử lý
           return;
         }
-        const updatedBooks = currentInfo.map((book) =>
-          book.childId.childBookId === childId
+        const updatedBooks = currentInfo.map((book) => {
+          const bookChildId = typeof book.childId === 'object'
+            ? book.childId?.childBookId
+            : book.childId;
+          return bookChildId === childId || bookChildId === String(childId)
             ? { ...book, checked: true }
-            : book
-        );
+            : book;
+        });
         setInfo(updatedBooks);
+        setResultChild(null); // Reset sau khi xử lý thành công
       }
     }
   }, [resultChild]);
   useEffect(() => {
     if (currentInfo?.length > 0) {
-      const allChecked = currentInfo.every((book) => book.checked === true);
-      setDone(allChecked);
-      console.log("allChecked", allChecked);
+      // ✅ Với trả sách: cho phép hoàn tất ngay cả khi chưa quét hết
+      // Với mượn sách: phải quét đủ tất cả sách
+      const isReturning = currentChoose?.status === "Đang mượn" || currentChoose?.status === "Đã hết hạn";
+      
+      if (isReturning) {
+        // Trả sách: cho phép hoàn tất nếu ít nhất 1 sách đã được check
+        const atLeastOneChecked = currentInfo.some((book) => book.checked === true);
+        setDone(atLeastOneChecked);
+        console.log("Trả sách - atLeastOneChecked:", atLeastOneChecked);
+      } else {
+        // Mượn sách: phải quét đủ tất cả sách
+        const allChecked = currentInfo.every((book) => book.checked === true);
+        setDone(allChecked);
+        console.log("Mượn sách - allChecked:", allChecked);
+      }
     } else {
       setDone(false); // reset nếu danh sách rỗng
     }
-  }, [currentInfo]);
+  }, [currentInfo, currentChoose]);
   const handleCloseCard = () => {
     setCurrent(null);
     setInfo(null);
@@ -304,6 +439,7 @@ const UploadImage = () => {
       let response;
       console.log(children)
       if (currentChoose.status === "Đã yêu cầu") {
+        // MƯỢN SÁCH: gọi API /borrow với danh sách barcode
         response = await fetch(
           `${process.env.NEXT_PUBLIC_API_URL}/api/borrow-cards/borrow/${currentChoose?.id}`,
           {
@@ -317,30 +453,75 @@ const UploadImage = () => {
         setChildren([])
         console.log(children)
       } else {
-        response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/borrow-cards/return/${currentChoose?.id}`,
-          {
-            method: "PUT",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(children),
+        // TRẢ SÁCH: gọi API /return-one cho từng sách đã check
+        const checkedBooks = currentInfo.filter(book => book.checked);
+        
+        for (const book of checkedBooks) {
+          // ✅ Lấy barcode đúng: có thể là string hoặc nested object
+          let barcode;
+          if (typeof book.childId === 'object' && book.childId?.childBookId) {
+            barcode = book.childId.childBookId;
+          } else if (typeof book.childId === 'string') {
+            barcode = book.childId;
+          } else {
+            console.error("Không xác định được barcode từ book:", book);
+            continue;
           }
-        );
-         setChildren([])
-        console.log(children)
+          
+          console.log("Trả sách với barcode:", barcode);
+          
+          const returnResponse = await fetch(
+            `${process.env.NEXT_PUBLIC_API_URL}/api/borrow-cards/return-one/${currentChoose?.id}`,
+            {
+              method: "PUT",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ barcode: String(barcode) }),
+            }
+          );
+          
+          if (!returnResponse.ok) {
+            const errorText = await returnResponse.text();
+            throw new Error(`Không thể trả sách ${barcode}: ${errorText}`);
+          }
+        }
+        
+        response = { ok: true }; // Đánh dấu thành công
+        setChildren([])
+        console.log("Đã trả các sách:", checkedBooks.map(b => b.childId))
       }
 
       if (!response.ok) {
         window.alert("Không thể cập nhật phiếu mượn");
       } else {
         window.alert("Updated");
-        handleCloseCard();
+        
+        // ✅ Refresh dữ liệu trước
         await getBorrowCard();
+        
+        // ✅ Nếu đang trả sách, reload lại thông tin phiếu mượn để cập nhật
+        if (currentChoose.status === "Đang mượn" || currentChoose.status === "Đã hết hạn") {
+          // Tìm phiếu mượn đã cập nhật từ server
+          const response = await fetch(
+            `${process.env.NEXT_PUBLIC_API_URL}/api/borrow-cards/${currentChoose.id}`,
+            { method: "GET" }
+          );
+          
+          if (response.ok) {
+            const updatedCard = await response.json();
+            setCurrent(updatedCard); // Cập nhật currentChoose với data mới
+            // getBookIdsInfo sẽ tự động chạy lại nhờ useEffect
+          } else {
+            handleCloseCard(); // Nếu lỗi thì đóng modal
+          }
+        } else {
+          handleCloseCard(); // Mượn sách xong thì đóng modal
+        }
       }
     } catch (error) {
       console.error(error);
-      window.alert("Có lỗi xảy ra khi cập nhật");
+      window.alert(error.message || "Có lỗi xảy ra khi cập nhật");
     } finally {
       setLoading(false);
     }
@@ -380,6 +561,18 @@ const UploadImage = () => {
               Nhập Enter để tiến hành tìm kiếm
             </p>
           </div>
+
+          <p className="text-2xl font-semibold mt-6">Hoặc</p>
+
+          {/* Nút quét QR code */}
+          <button
+            onClick={() => setShowQRScanner(true)}
+            className="flex items-center gap-2 px-6 py-3 bg-[#062D76] text-white rounded-lg hover:bg-[#04204F] transition-colors"
+          >
+            <QrCode size={24} />
+            <span className="font-semibold">Quét mã QR người dùng</span>
+          </button>
+
           <p className="text-2xl font-semibold mt-10">Hoặc</p>
           <p className="text-xl font-semibold ">
             Tải ảnh barcode mã người dùng của bạn
@@ -436,6 +629,7 @@ const UploadImage = () => {
                   <UploadChild
                     resultChild={resultChild}
                     setResultChild={setResultChild}
+                    onOpenBarcodeScanner={() => setShowBarcodeScanner(true)}
                   />
                 </div>
               </div>
@@ -502,6 +696,22 @@ const UploadImage = () => {
           </div>
         </div>
       )}
+
+      {/* Modal quét QR code người dùng */}
+      <CameraScanner
+        isOpen={showQRScanner}
+        scanType="qrcode"
+        onScanSuccess={(decodedText) => handleQRScanSuccess(decodedText, "qrcode")}
+        onClose={() => setShowQRScanner(false)}
+      />
+
+      {/* Modal quét barcode sách */}
+      <CameraScanner
+        isOpen={showBarcodeScanner}
+        scanType="barcode"
+        onScanSuccess={(decodedText) => handleBarcodeScanSuccess(decodedText, "barcode")}
+        onClose={() => setShowBarcodeScanner(false)}
+      />
     </div>
   );
 };

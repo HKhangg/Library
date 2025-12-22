@@ -14,6 +14,7 @@ const BookCard = ({
   author,
   publisher,
   location,
+  bookId,
 }) => {
   return (
     <article className="flex grow shrink gap-3 min-w-60 cursor-pointer bg-white rounded-xl shadow-[0px_2px_2px_rgba(0,0,0,0.25)] p-5">
@@ -26,6 +27,11 @@ const BookCard = ({
         <h3 className="flex-1 shrink gap-2.5 self-stretch mt-2 w-full text-[1.125rem] font-medium text-black basis-0">
           {title}
         </h3>
+        {bookId && (
+          <p className="flex-1 shrink gap-2.5 self-stretch mt-2 w-full text-base text-black basis-0">
+            ID sách: {bookId}
+          </p>
+        )}
         <p className="flex-1 shrink gap-2.5 self-stretch mt-2 w-full text-base text-black basis-0">
           Tác giả: {author}
         </p>
@@ -116,7 +122,8 @@ const ChiTietPhieuMuon = () => {
           }
         );
         const res = await response.json();
-        // console.log(res);
+        console.log("API Response:", res);
+        console.log("BookIds array:", res.bookIds);
         setBorrowDetail(res);
       } catch (error) {
         console.error("Lỗi khi fetch chi tiết phiếu mượn:", error);
@@ -207,6 +214,7 @@ const ChiTietPhieuMuon = () => {
                     category={book.category}
                     publisher={book.publisher}
                     location={book.viTri}
+                    bookId={book.maSach}
                   />
                 ))}
               </section>

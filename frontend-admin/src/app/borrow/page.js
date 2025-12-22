@@ -20,7 +20,7 @@ import { ThreeDot } from "react-loading-indicators";
 const Page = () => {
   const [allBorrowCards, setAllBorrowCards] = useState([]);
   const [selectedButton, setSelectedButton] = useState("Đã yêu cầu");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const itemsPerPage = 10;
@@ -36,8 +36,9 @@ const Page = () => {
       );
       const data = await response.json();
       console.log(data);
-      setAllBorrowCards(data);
-      setTotalPages(Math.ceil(data.length / itemsPerPage) || 1);
+      const cardsArray = Array.isArray(data) ? data : [];
+      setAllBorrowCards(cardsArray);
+      setTotalPages(Math.ceil(cardsArray.length / itemsPerPage) || 1);
       setCurrentPage(1); // Reset to first page
     } catch (error) {
       console.error("Lỗi khi fetch phiếu mượn:", error);
@@ -51,12 +52,12 @@ const Page = () => {
     fetchBorrowCards();
   }, []);
 
-  const filteredCards = allBorrowCards?.filter((card) => {
+  const filteredCards = Array.isArray(allBorrowCards) ? allBorrowCards.filter((card) => {
     if (selectedButton === "Đã yêu cầu") return card.status === "Đã yêu cầu";
     if (selectedButton === "Đang mượn") return card.status === "Đang mượn";
     if (selectedButton === "Đã trả") return card.status === "Đã trả";
     return false;
-  });
+  }) : [];
 
   const [searchQuery, setSearchQuery] = useState("");
   const [searchFilter, setSearchFilter] = useState([]);

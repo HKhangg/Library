@@ -3,8 +3,9 @@ import React, { useEffect, useState } from "react";
 import { Button } from "../../components/ui/button";
 import { ThreeDot } from "react-loading-indicators";
 import toast from "react-hot-toast";
+import { Scan } from "lucide-react";
 
-const UploadChild = ({ resultChild, setResultChild }) => {
+const UploadChild = ({ resultChild, setResultChild, onOpenBarcodeScanner }) => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
@@ -106,7 +107,21 @@ const UploadChild = ({ resultChild, setResultChild }) => {
               Nhập Enter để tiến hành tìm kiếm
             </p>
           </div>
-          <p className="text-2xl font-semibold mt-10">Hoặc</p>
+
+          <p className="text-2xl font-semibold mt-6">Hoặc</p>
+
+          {/* Nút quét barcode sách */}
+          {onOpenBarcodeScanner && (
+            <button
+              onClick={onOpenBarcodeScanner}
+              className="flex items-center gap-2 px-6 py-3 bg-[#062D76] text-white rounded-lg hover:bg-[#04204F] transition-colors shadow-md"
+            >
+              <Scan size={24} />
+              <span className="font-semibold">Quét barcode sách</span>
+            </button>
+          )}
+
+          <p className="text-2xl font-semibold mt-6">Hoặc</p>
           <p className="text-xl font-semibold ">Tải ảnh barcode mã sách</p>
           <div className="flex gap-0">
             <input type="file" onChange={onFileChange} />

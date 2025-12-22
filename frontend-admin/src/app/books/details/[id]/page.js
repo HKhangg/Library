@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { useParams } from "next/navigation";
-import { CalendarClock, Check, Search, X } from "lucide-react";
+import { CalendarClock, Check, Search, X, Download, Printer } from "lucide-react";
 import { ThreeDot } from "react-loading-indicators";
 import toast, { Toaster } from "react-hot-toast";
+import Barcode from "react-barcode";
 
 import Sidebar from "@/app/components/sidebar/Sidebar";
 import axios from "axios";
@@ -60,6 +61,7 @@ const Page = () => {
         ...prev,
         {
           id: newChildBook.id,
+          barcode: newChildBook.barcode,
           status: "AVAILABLE",
         },
       ]);
@@ -93,7 +95,7 @@ const Page = () => {
   const handleSearch = () => {
     if (searchQuery.trim()) {
       const result = childBookList.filter(
-        (cb) => cb.id.toString() === searchQuery.trim()
+        (cb) => cb.id.toString() === searchQuery.trim() || cb.barcode === searchQuery.trim()
       );
       if (result.length === 0) toast.error("Không tìm thấy kết quả");
       setFilterBooks(result);
@@ -152,30 +154,118 @@ const Page = () => {
     </div>
   );
 
-  const ChildBookCard = ({ book }) => (
-    <div className="flex bg-white rounded-lg shadow p-4 items-center justify-between">
-      <div className="flex items-center gap-2 font-medium">
-        <span>ID con: {book.id}</span>
-        {book.status === "AVAILABLE" && (
-          <Check className="w-5 h-5 text-green-500" />
-        )}
-        {book.status === "BORROWED" && (
-          <CalendarClock className="w-5 h-5 text-yellow-500" />
-        )}
-        {book.status === "NOT_AVAILABLE" && (
-          <X className="w-5 h-5 text-red-500" />
+  const ChildBookCard = ({ book }) => {
+    const barcodeRef = useRef(null);
+
+    const handleDownloadBarcode = () => {
+      if (!barcodeRef.current) return;
+      const svg = barcodeRef.current.querySelector("svg");
+      if (!svg) return;
+
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+      const svgData = new XMLSerializer().serializeToString(svg);
+      const img = new Image();
+      
+      img.onload = () => {
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.fillStyle = "white";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0);
+        
+        canvas.toBlob((blob) => {
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `barcode-${book.barcode}.png`;
+          a.click();
+          URL.revokeObjectURL(url);
+        });
+      };
+      
+      img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData)));
+    };
+
+    const handlePrintBarcode = () => {
+      if (!barcodeRef.current) return;
+      const printWindow = window.open("", "_blank");
+      const barcodeHTML = barcodeRef.current.innerHTML;
+      
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Print Barcode - ${book.barcode}</title>
+            <style>
+              body { margin: 0; padding: 20px; display: flex; justify-content: center; align-items: center; height: 100vh; }
+              @media print { body { margin: 0; padding: 10px; } }
+            </style>
+          </head>
+          <body>${barcodeHTML}</body>
+        </html>
+      `);
+      printWindow.document.close();
+      setTimeout(() => {
+        printWindow.print();
+        printWindow.close();
+      }, 250);
+    };
+
+    return (
+      <div className="flex flex-col bg-white rounded-lg shadow p-4 gap-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 font-medium text-sm">
+            <span>ID: {book.id}</span>
+            {book.status === "AVAILABLE" && (
+              <Check className="w-5 h-5 text-green-500" />
+            )}
+            {book.status === "BORROWED" && (
+              <CalendarClock className="w-5 h-5 text-yellow-500" />
+            )}
+            {book.status === "NOT_AVAILABLE" && (
+              <X className="w-5 h-5 text-red-500" />
+            )}
+          </div>
+          <Button
+            disabled={actionLoading}
+            onClick={() => handleDeleteChild(book.id)}
+            size="sm"
+            variant="destructive"
+          >
+            Xóa
+          </Button>
+        </div>
+        
+        {book.barcode && (
+          <div className="flex flex-col gap-2 border-t pt-3">
+            <div ref={barcodeRef} className="flex justify-center">
+              <Barcode value={book.barcode} width={1.5} height={50} fontSize={12} />
+            </div>
+            <div className="flex gap-2">
+              <Button
+                onClick={handleDownloadBarcode}
+                size="sm"
+                variant="outline"
+                className="flex-1 text-xs"
+              >
+                <Download className="w-3 h-3 mr-1" />
+                Tải về
+              </Button>
+              <Button
+                onClick={handlePrintBarcode}
+                size="sm"
+                variant="outline"
+                className="flex-1 text-xs"
+              >
+                <Printer className="w-3 h-3 mr-1" />
+                In
+              </Button>
+            </div>
+          </div>
         )}
       </div>
-      <Button
-        disabled={actionLoading}
-        onClick={() => handleDeleteChild(book.id)}
-        size="sm"
-        variant="destructive"
-      >
-        Xóa
-      </Button>
-    </div>
-  );
+    );
+  };
 
   if (loading)
     return (
@@ -193,7 +283,7 @@ const Page = () => {
       <div className="flex-1 p-6 md:ml-52">
         <div className="flex mb-6">
           <Input
-            placeholder="Tìm kiếm sách con theo ID"
+            placeholder="Tìm kiếm sách con theo ID hoặc Barcode"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="flex-1 h-10 px-4 rounded-lg"
