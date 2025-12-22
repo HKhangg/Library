@@ -71,7 +71,7 @@ const Page = () => {
     <main className="flex flex-col min-h-screen text-foreground w-full">
       <div className="pt-16 flex">
         <LeftSideBar />
-        <section className="self-stretch pr-[1.25rem] md:pl-60 ml-[1.25rem] my-auto w-full max-md:max-w-full mt-2 mb-2">
+        <section className="self-stretch pr-[1.25rem] md:pl-60 ml-[1.25rem] z-100 my-auto w-full max-md:max-w-full mt-2 mb-2">
           <div className="mx-auto">
             <header className="flex justify-between gap-8 max-lg:gap-3 max-sm:flex-col bg-white dark:bg-gray-700 p-3 rounded-xl transition-colors duration-300">
               {/* Current Borrowings Status */}

@@ -50,7 +50,7 @@ const BookCard = ({
 
 const BorrowingInfo = ({ info }) => {
   return (
-    <section className=" flex flex-col p-5 bg-white rounded-xl shadow-[0px_4px_4px_rgba(0,0,0,0.25)] max-md:px-5 max-md:max-w-full">
+    <section className=" flex flex-col p-5 bg-white rounded-xl shadow-[0px_4px_4px_rgba(0,0,0,0.25)] z-100 max-md:px-5 max-md:max-w-full">
       <div className="grid grid-cols-2 gap-5 max-md:grid-cols-1">
         {/* Cột 1 */}
         <div className="flex flex-col gap-5 items-start text-[1.125rem] font-medium text-black">
@@ -199,7 +199,7 @@ const ChiTietPhieuMuon = () => {
             <h2 className="text-lg font-medium text-[#062D76] dark:text-white text-center mt-5 ">
               Danh sách sách mượn
             </h2>
-            <section className="grid grid-cols-1 max-sm:grid-cols-1 gap-5 items-start mt-2 w-full max-md:max-w-full">
+            <section className="grid grid-cols-1 max-sm:grid-cols-1 gap-5 items-start mt-2 z-100 w-full max-md:max-w-full">
               {borrowDetail?.bookIds?.map((book, index) => (
                 <BookCard
                   key={index}
