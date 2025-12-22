@@ -83,10 +83,7 @@ useEffect(() => {
       const booksInCart = selected;
       const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/borrow-cards`, {
         userId: user.id,
-        borrowedBooks: booksInCart.map((bookId) => ({ bookId, childBookId: null })),
-        borrowDate: new Date().toISOString(),
-        status: "REQUESTED",
-        dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+        bookIds: booksInCart, // ✅ Sửa: gửi bookIds thay vì borrowedBooks
       });
 
       if (response.status === 200) {

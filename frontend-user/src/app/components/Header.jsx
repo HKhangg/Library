@@ -695,6 +695,16 @@ const DarkModeToggle = () => {
                   </MenuItem>
                   <MenuItem>
                     {({ active }) => (
+                      <Link
+                        href="/user-qrcode"
+                        className={`block px-4 py-2 font-sans font-bold text-gray-700 dark:text-gray-300 hover:text-[#30c9e8] dark:hover:text-[#30c9e8] ${active && "bg-gray-100 dark:bg-gray-700"}`}
+                      >
+                        Mã QR của tôi
+                      </Link>
+                    )}
+                  </MenuItem>
+                  <MenuItem>
+                    {({ active }) => (
                       <button
                         onClick={handleLogout}
                         className={`w-full font-sans font-bold text-left px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-[#30c9e8] dark:hover:text-[#30c9e8] ${active && "bg-gray-100 dark:bg-gray-700"}`}

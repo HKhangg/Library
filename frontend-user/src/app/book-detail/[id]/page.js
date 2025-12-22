@@ -109,22 +109,20 @@ const BookDetailsPage = () => {
           `${process.env.NEXT_PUBLIC_API_URL}/api/borrow-cards`,
           {
             userId: user.id,
-            borrowedBooks: [{ bookId: id, childBookId: null }],
-            borrowDate: new Date().toISOString(),
-            status: "REQUESTED",
-            dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+            bookIds: [parseInt(id)]  // Gửi đúng format như backend expect
           }
         );
 
         if (response.status === 200) {
-          alert("Phiếu mượn đã được tạo");
+          alert("Phiếu mượn đã được tạo thành công!");
           window.location.href = "/borrowed-card";
         } else {
           alert("Có lỗi xảy ra khi tạo phiếu mượn");
         }
       } catch (error) {
-        console.error("Lỗi gọi API mượn quá sách:", error);
-        alert("Bạn đã vượt quá số lượng sách mượn tối đa hoặc có lỗi xảy ra.");
+        console.error("Lỗi gọi API mượn sách:", error);
+        const errorMsg = error.response?.data?.message || error.response?.data || "Có lỗi xảy ra";
+        alert(errorMsg);
       }
     }
   };
