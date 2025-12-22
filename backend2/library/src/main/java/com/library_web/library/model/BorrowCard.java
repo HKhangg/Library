@@ -69,14 +69,15 @@ public class BorrowCard {
       }
     }
   }
-    public List<Long> getBookIdsAsLong() {
-      if (borrowedBooks == null) {
-          return Collections.emptyList();
-      }
-      return borrowedBooks.stream()
-                          .map(BorrowedBook::getBookId)
-                          .filter(Objects::nonNull)
-                          .collect(Collectors.toList());
+
+  public List<Long> getBookIdsAsLong() {
+    if (borrowedBooks == null) {
+      return Collections.emptyList();
+    }
+    return borrowedBooks.stream()
+        .map(BorrowedBook::getBookId)
+        .filter(Objects::nonNull)
+        .collect(Collectors.toList());
   }
 
   public BorrowCard(Long userId, LocalDateTime borrowDate, int waitingToTake, List<BorrowedBook> borrowedBooks) {
@@ -123,7 +124,15 @@ public class BorrowCard {
   }
 
   public void setBorrowedBooks(List<BorrowedBook> borrowedBooks) {
-    this.borrowedBooks = borrowedBooks;
+    this.borrowedBooks.clear();
+    if (borrowedBooks != null) {
+      borrowedBooks.forEach(this::addBorrowedBook);
+    }
+  }
+
+  public void addBorrowedBook(BorrowedBook borrowedBook) {
+    borrowedBooks.add(borrowedBook);
+    borrowedBook.setBorrowCard(this);
   }
 
   public LocalDateTime getBorrowDate() {
