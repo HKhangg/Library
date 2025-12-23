@@ -163,8 +163,8 @@ const UploadImage = () => {
     }
   };
   //hàm lấy phiếu mượn
-  const fetchBorrowCardsForUser = useCallback(async (userId) => {
-    console.log("🔍 fetchBorrowCardsForUser called with userId:", userId);
+  const fetchBorrowCardsForUser = useCallback(async (userId, force = false) => {
+    console.log("🔍 fetchBorrowCardsForUser called with userId:", userId, "force:", force);
     console.log("🔍 lastFetchedUserId.current:", lastFetchedUserId.current);
     console.log("🔍 isFetchingRef.current:", isFetchingRef.current);
     
@@ -172,18 +172,16 @@ const UploadImage = () => {
       console.log("❌ No userId provided");
       return;
     }
-    
-    // Kiểm tra xem đang fetch hay đã fetch cho userId này chưa
+    // Nếu đang fetch thì bỏ qua
     if (isFetchingRef.current) {
       console.log("⏳ Already fetching, skipping...");
       return;
     }
-    
-    if (lastFetchedUserId.current === userId) {
+    // Nếu không force và userId trùng thì bỏ qua
+    if (!force && lastFetchedUserId.current === userId) {
       console.log("✅ Already fetched borrow cards for user", userId);
       return;
     }
-    
     console.log("🚀 Fetching borrow cards for user", userId);
     isFetchingRef.current = true;
     lastFetchedUserId.current = userId;
@@ -497,28 +495,10 @@ const UploadImage = () => {
         window.alert("Không thể cập nhật phiếu mượn");
       } else {
         window.alert("Updated");
-        
-        // ✅ Refresh dữ liệu trước
-        await getBorrowCard();
-        
-        // ✅ Nếu đang trả sách, reload lại thông tin phiếu mượn để cập nhật
-        if (currentChoose.status === "Đang mượn" || currentChoose.status === "Đã hết hạn") {
-          // Tìm phiếu mượn đã cập nhật từ server
-          const response = await fetch(
-            `${process.env.NEXT_PUBLIC_API_URL}/api/borrow-cards/${currentChoose.id}`,
-            { method: "GET" }
-          );
-          
-          if (response.ok) {
-            const updatedCard = await response.json();
-            setCurrent(updatedCard); // Cập nhật currentChoose với data mới
-            // getBookIdsInfo sẽ tự động chạy lại nhờ useEffect
-          } else {
-            handleCloseCard(); // Nếu lỗi thì đóng modal
-          }
-        } else {
-          handleCloseCard(); // Mượn sách xong thì đóng modal
-        }
+        // Sau khi mượn/trả thành công, cập nhật danh sách phiếu mượn
+        const userId = result?.id || currentChoose?.userId;
+        await fetchBorrowCardsForUser(userId, true);
+        setCurrent(null); // Đóng modal chi tiết phiếu mượn
       }
     } catch (error) {
       console.error(error);
