@@ -31,16 +31,18 @@ const Page = () => {
   const [apiUrl, setApiUrl] = useState(`${process.env.NEXT_PUBLIC_API_URL}/api/book`);
 
   // useSWR: Fetch dữ liệu sách
-  const { data: booksData = [], isLoading, error } = useSWR(
-    apiUrl,
-    fetcher,
-    {
-      revalidateOnFocus: false,
-      dedupingInterval: 60000, // Cache 1 phút
-      keepPreviousData: true, 
-      onError: () => toast.error("Không thể tải danh sách sách"),
-    }
-  );
+ // Tìm đến đoạn useSWR và sửa lại như sau:
+const { data: booksData = [], isLoading, error, mutate } = useSWR(
+  apiUrl,
+  fetcher,
+  {
+    revalidateOnFocus: true, 
+    revalidateIfStale: true, 
+    dedupingInterval: 0,      
+    keepPreviousData: true, 
+    onError: () => toast.error("Không thể tải danh sách sách"),
+  }
+);
 
   // Đảm bảo dữ liệu luôn là mảng
   const safeBookList = Array.isArray(booksData) ? booksData : [];
@@ -110,6 +112,7 @@ const Page = () => {
         (currentData) => currentData.filter((b) => b.maSach !== book.maSach),
         false // false = không fetch lại ngay
       );
+      await mutate(apiUrl);
 
       toast.success("Xóa sách thành công", { id: toastId });
 

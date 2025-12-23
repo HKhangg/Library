@@ -39,7 +39,7 @@ public class Book {
      // @JsonIgnore
      @CollectionTable(name = "book_hinh_anh", joinColumns = @JoinColumn(name = "book_ma_sach"))
      @Column(name = "hinh_anh")
-     private List<String> hinhAnh;
+     private List<String> hinhAnh = new ArrayList<>();;
 
      @ManyToOne(fetch = FetchType.LAZY)
      @JoinColumn(name = "category_child_id")
@@ -223,8 +223,14 @@ public class Book {
      }
 
      public void setHinhAnh(List<String> hinhAnh) {
-          this.hinhAnh = hinhAnh;
-     }
+    if (this.hinhAnh == null) {
+        this.hinhAnh = new ArrayList<>();
+    }
+    this.hinhAnh.clear();
+    if (hinhAnh != null) {
+        this.hinhAnh.addAll(hinhAnh);
+    }
+}
 
      public CategoryChild getCategoryChild() {
           return categoryChild;
