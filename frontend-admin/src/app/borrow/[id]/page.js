@@ -1,11 +1,11 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/app/components/ui/button";
 import toast, { Toaster } from "react-hot-toast";
 import { ThreeDot } from "react-loading-indicators";
 import Sidebar from "@/app/components/sidebar/Sidebar";
-import { Undo2 } from "lucide-react";
+import { Undo2, Trash2 } from "lucide-react";
 
 import useSWR from "swr";
 import { fetcher } from "@/lib/fetcher"; 
@@ -48,7 +48,6 @@ const BookCard = ({
         <p className="flex-1 shrink gap-2.5 self-stretch mt-2 w-full text-base text-black basis-0">
           Vị trí tủ: {location}
         </p>
-
       </div>
     </article>
   );
@@ -58,7 +57,6 @@ const BorrowingInfo = ({ info }) => {
   return (
     <section className="flex flex-col p-5 bg-white rounded-xl shadow-[0px_4px_4px_rgba(0,0,0,0.25)] max-md:px-5 max-md:max-w-full">
       <div className="grid grid-cols-2 gap-5 max-md:grid-cols-1">
-        {/* Cột 1 */}
         <div className="flex flex-col gap-5 items-start text-[1.125rem] font-medium text-black">
           <p className="text-[1rem] font-semibold text-[#131313]/50">
             ID Phiếu: <span className="text-[#131313] font-medium ">{info.id}</span>
@@ -86,7 +84,6 @@ const BorrowingInfo = ({ info }) => {
           )}
         </div>
 
-        {/* Cột 2 */}
         <div className="flex flex-col gap-5 items-start text-[1.125rem] font-medium text-black">
           <p className="text-[1rem] font-semibold text-[#131313]/50">
             ID Người Dùng:{" "}
@@ -111,32 +108,11 @@ const BorrowingInfo = ({ info }) => {
 const ChiTietPhieuMuon = () => {
   const { id } = useParams();
   const router = useRouter();
-  useEffect(() => {
-    const fetchBorrowCardDetail = async () => {
-      try {
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/borrow-cards/${id}`,
-          {
-            method: "GET",
-          }
-        );
-        const res = await response.json();
-        console.log("API Response:", res);
-        console.log("BookIds array:", res.bookIds);
-        setBorrowDetail(res);
-      } catch (error) {
-        console.error("Lỗi khi fetch chi tiết phiếu mượn:", error);
-        toast.error("Không thể tải dữ liệu phiếu mượn");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchBorrowCardDetail();
-  }, [id]);
 
+  const [popUpOpen, setPopUpOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  // useSWR: Lấy thông tin chi tiết phiếu mượn
-  const { data: borrowDetail, isLoading, error } = useSWR(
+  const { data: borrowDetail, isLoading } = useSWR(
     id ? `${process.env.NEXT_PUBLIC_API_URL}/api/borrow-cards/${id}` : null,
     fetcher,
     {
@@ -149,15 +125,14 @@ const ChiTietPhieuMuon = () => {
     router.back();
   };
 
-  // Xử lý Xóa Phiếu Mượn (Async + Toast Loading)
   const handleDelete = async () => {
-    if (!borrowDetail) return;
+    if (!borrowDetail || isDeleting) return;
 
     const toastId = toast.loading("Đang xóa phiếu mượn...");
+    setIsDeleting(true);
     try {
-      // Dùng fetch trực tiếp cho DELETE (vì fetcher mặc định là GET)
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/borrow-cards/${borrowDetail.borrowCardId || id}`, // Fallback ID nếu API trả về khác
+        `${process.env.NEXT_PUBLIC_API_URL}/api/borrow-cards/${id}`,
         { method: "DELETE" }
       );
 
@@ -166,14 +141,15 @@ const ChiTietPhieuMuon = () => {
       toast.success("Xóa phiếu thành công", { id: toastId });
       setPopUpOpen(false);
 
-      // Chuyển trang sau khi xóa
       setTimeout(() => {
         router.push("/borrow");
       }, 500);
 
     } catch (err) {
-      console.error("Lỗi xóa:", err);
+      console.error(err);
       toast.error("Xóa phiếu thất bại", { id: toastId });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -187,7 +163,6 @@ const ChiTietPhieuMuon = () => {
               color="#062D76"
               size="large"
               text="Đang tải dữ liệu..."
-              variant="bounce"
               textColor="#062D76"
             />
           </section>
@@ -202,8 +177,7 @@ const ChiTietPhieuMuon = () => {
       <div className="flex">
         <Sidebar />
         <section className="self-stretch pr-[1.25rem] md:pl-60 ml-[1.25rem] my-auto w-full max-md:max-w-full mt-2 mb-2">
-          {/* Nút Back */}
-          <div className="absolute top-5 left-5 md:left-57 fixed z-10">
+          <div className="absolute top-5 left-5 md:left-57 z-10">
             <Button
               title={"Quay Lại"}
               className="bg-[#062D76] rounded-3xl w-10 h-10 hover:bg-gray-700"
@@ -216,10 +190,10 @@ const ChiTietPhieuMuon = () => {
           {borrowDetail ? (
             <div className="flex flex-col w-full max-md:max-w-full mt-10 px-10">
               <Button
-                className={`flex self-end text-[1rem] cursor-pointer bg-red-500 hover:bg-red-700 text-white w-fit mb-4`}
+                className="flex self-end text-[1rem] cursor-pointer bg-red-500 hover:bg-red-700 text-white w-fit mb-4"
                 onClick={() => setPopUpOpen(true)}
               >
-                <Trash2Icon className="mr-2 w-5 h-5" />
+                <Trash2 className="mr-2 w-5 h-5" />
                 Xóa Phiếu
               </Button>
 
@@ -228,7 +202,7 @@ const ChiTietPhieuMuon = () => {
               <h2 className="text-lg font-medium text-[#062D76] text-center mt-8 mb-4">
                 Danh sách sách mượn
               </h2>
-              <section className="grid grid-cols-1 max-sm:grid-cols-1 gap-5 items-start mt-2 w-full max-md:max-w-full">
+              <section className="grid grid-cols-1 gap-5 items-start mt-2 w-full max-md:max-w-full">
                 {borrowDetail?.bookIds?.map((book, index) => (
                   <BookCard
                     key={index}
@@ -251,13 +225,11 @@ const ChiTietPhieuMuon = () => {
           )}
         </section>
 
-        {/* Modal Xóa */}
         {popUpOpen && (
           <div className="fixed inset-0 items-center justify-center z-50 flex">
             <div className="w-full h-full bg-black opacity-80 absolute top-0 left-0"></div>
             <div className="relative flex flex-col justify-center bg-white p-6 rounded-lg shadow-lg w-auto min-w-[300px]">
               <div className="flex justify-center mb-2">
-                {/* Icon Warning simple */}
                 <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg>
               </div>
               <p className="text-center font-medium text-lg mb-4">
@@ -273,6 +245,7 @@ const ChiTietPhieuMuon = () => {
                 </Button>
                 <Button
                   className="bg-red-500 hover:bg-red-700 text-white min-w-[80px]"
+                  disabled={isDeleting}
                   onClick={handleDelete}
                 >
                   Xóa
@@ -285,10 +258,5 @@ const ChiTietPhieuMuon = () => {
     </main>
   );
 };
-
-// Component Trash Icon nhỏ để thay thế thẻ img
-const Trash2Icon = ({ className }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /><line x1="10" x2="10" y1="11" y2="17" /><line x1="14" x2="14" y1="11" y2="17" /></svg>
-)
 
 export default ChiTietPhieuMuon;

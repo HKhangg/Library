@@ -1,9 +1,9 @@
 "use client";
 
 // Conflict marker removed: keep user code
-import React, { useEffect, useState, useRef } from "react";
+import {React,  useEffect, useState, useRef, useMemo } from "react";
 // Conflict marker removed
-import React, { useState, useMemo } from "react";
+//import React, { useState, useMemo } from "react";
 // Conflict marker removed
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
@@ -22,6 +22,7 @@ const Page = () => {
   const { id } = useParams();
   const [searchQuery, setSearchQuery] = useState("");
 
+  const [actionLoading, setActionLoading] = useState(false);
   // useSWR: Lấy thông tin Sách cha
   const { data: book, isLoading: bookLoading } = useSWR(
     id ? `${process.env.NEXT_PUBLIC_API_URL}/api/book/${id}` : null,
@@ -136,6 +137,7 @@ const Page = () => {
   // Component UI: ChildBookCard
   // ...existing code...
 
+  
   if (loading) {
     return (
       <div className="flex bg-[#EFF3FB] min-h-screen">
@@ -147,6 +149,8 @@ const Page = () => {
     );
   }
 
+
+  
   return (
     <div className="flex flex-row w-full min-h-screen bg-[#EFF3FB]">
       <Toaster position="top-center" reverseOrder={false} />

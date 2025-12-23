@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useMemo, useEffect } from "react";
-import { useRouter, useSearchParams, usePathname } from "next/navigation"; // Import hooks điều hướng
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import Sidebar from "../components/sidebar/Sidebar";
 import {
   BookCheck,
@@ -21,96 +21,84 @@ import useSWR, { mutate } from "swr";
 import { fetcher } from "@/lib/fetcher";
 
 const Page = () => {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
   const [allBorrowCards, setAllBorrowCards] = useState([]);
-  const [selectedButton, setSelectedButton] = useState("Đã yêu cầu");
-  const [loading, setLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
   const itemsPerPage = 10;
+  const [currentTab, setCurrentTab] = useState("Đã yêu cầu");
+  const [localSearch, setLocalSearch] = useState("");
 
   const fetchBorrowCards = async () => {
-    setLoading(true);
+    setIsLoading(true);
     try {
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/api/borrow-cards`,
-        {
-          method: "GET",
-        }
+        { method: "GET" }
       );
+      if (!response.ok) throw new Error("Network response was not ok");
       const data = await response.json();
-      console.log(data);
       setAllBorrowCards(data);
-      setTotalPages(Math.ceil(data.length / itemsPerPage) || 1);
-      setCurrentPage(1); // Reset to first page
     } catch (error) {
-      console.error("Lỗi khi fetch phiếu mượn:", error);
+      console.error(error);
       toast.error("Không thể tải dữ liệu phiếu mượn.");
     } finally {
-      setLoading(false);
-    }
-
-    router.replace(`${pathname}?${params.toString()}`);
-  };
-
-  const filteredCards = allBorrowCards?.filter((card) => {
-    if (selectedButton === "Đã yêu cầu") return card.status === "Đã yêu cầu";
-    if (selectedButton === "Đang mượn") return card.status === "Đang mượn";
-    if (selectedButton === "Đã trả") return card.status === "Đã trả";
-    return false;
-  });
-
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchFilter, setSearchFilter] = useState([]);
-  const handleSearch = () => {
-    if (searchQuery) {
-      setLoading(true);
-      const filter = filteredCards?.filter((card) =>
-        card?.id.toString() === searchQuery || // tìm theo id
-        card?.userId.toString() === searchQuery
-          ? card
-          : null
-      );
-      setSearchFilter(filter);
-      setTotalPages(Math.ceil(filter.length / itemsPerPage) || 1);
-      setCurrentPage(1); // Reset to first page
-      setLoading(false);
-      if (filter.length < 1) toast.error("Không tìm thấy kết quả");
-    } else {
-      setSearchFilter([]);
-      setTotalPages(Math.ceil(filteredCards.length / itemsPerPage) || 1);
-      setCurrentPage(1); // Reset to first page
+      setIsLoading(false);
     }
   };
 
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("vi-VN"); // Kết quả: 22/04/2025
+  useEffect(() => {
+    fetchBorrowCards();
+  }, []);
+
+  const filteredCards = useMemo(() => {
+    return allBorrowCards.filter((card) => {
+      const matchTab = card.status === currentTab;
+      const matchSearch = localSearch.trim() === "" 
+        ? true 
+        : card.id.toString().includes(localSearch.trim()) || 
+          card.userId.toString().includes(localSearch.trim());
+      return matchTab && matchSearch;
+    });
+  }, [allBorrowCards, currentTab, localSearch]);
+
+  const totalPages = Math.ceil(filteredCards.length / itemsPerPage) || 1;
+  const paginatedCards = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredCards.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredCards, currentPage]);
+
+  const handlePageChange = (newPage) => {
+    setCurrentPage(newPage);
   };
 
   const handleTabChange = (tabName) => {
-    updateParams({ tab: tabName });
+    setCurrentTab(tabName);
+    setCurrentPage(1);
   };
 
   const handleSearchSubmit = () => {
-    updateParams({ query: localSearch });
+    setCurrentPage(1);
   };
 
   const handleDetails = (id) => {
-    router.push(`/borrow/${id}`); 
+    router.push(`/borrow/${id}`);
   };
 
   const handleAddBorrow = () => {
     router.push(`/borrow/addBorrow`);
   };
 
-  // Logic xử lý nghiệp vụ
   const handleExpired = async () => {
     if (!confirm("Bạn chắc chắn muốn tiến hành xem xét các phiếu quá hạn?")) return;
     const toastId = toast.loading("Đang xử lý...");
     const today = new Date();
 
     const expiredList = allBorrowCards.filter((card) => {
-      if (card.status !== "Đã yêu cầu" && card.status !== "REQUESTED") return false;
+      if (card.status !== "Đã yêu cầu") return false;
       return new Date(card.getBookDate) < today;
     });
 
@@ -128,7 +116,7 @@ const Page = () => {
           )
         )
       );
-      await mutateBorrowCards();
+      await fetchBorrowCards();
       toast.success(`Đã xử lý ${expiredList.length} phiếu`, { id: toastId });
     } catch (error) {
       console.error(error);
@@ -140,7 +128,6 @@ const Page = () => {
     if (!confirm("Gửi mail hối trả sách cho danh sách hiện tại?")) return;
     const toastId = toast.loading("Đang gửi email...");
 
-    // Gửi mail cho list đang mượn
     if (filteredCards.length === 0) {
       toast("Danh sách trống", { id: toastId, icon: "ℹ️" });
       return;
@@ -177,7 +164,6 @@ const Page = () => {
         <section className="self-stretch pr-[1.25rem] md:pl-60 ml-[1.25rem] my-auto w-full max-md:max-w-full mt-2 mb-2">
           <div className="mx-auto">
             <header className="flex justify-between gap-8 max-lg:gap-3 max-sm:flex-col p-3 rounded-xl">
-              {/* Tab Controls */}
               <div className="flex w-2/3 gap-5">
                 <Button
                   className={`flex flex-1 gap-3 justify-center text-white hover:bg-gray-500 items-center text-[1.125rem] max-md:text-[1rem] font-medium rounded-md py-5 max-md:py-2 cursor-pointer ${currentTab === "Đã yêu cầu" ? "bg-[#062D76]" : "bg-[#b6cefa]"
@@ -204,7 +190,6 @@ const Page = () => {
                 </Button>
               </div>
 
-              {/* Search Control */}
               <div className="flex gap-5">
                 <Input
                   type="text"
@@ -223,7 +208,6 @@ const Page = () => {
               </div>
             </header>
 
-            {/* List */}
             <section className="gap-y-2.5 mt-5">
               {isLoading ? (
                 <div className="flex justify-center">
@@ -276,7 +260,6 @@ const Page = () => {
               )}
             </section>
 
-            {/* Pagination */}
             {totalPages > 1 && (
               <div className="flex justify-center items-center gap-2 mt-6">
                 <Button
@@ -299,7 +282,6 @@ const Page = () => {
               </div>
             )}
 
-            {/* Floating Actions */}
             <div className={`fixed bottom-6 right-10 flex flex-col gap-4`}>
               {currentTab === "Đã yêu cầu" && (
                 <>
@@ -330,7 +312,6 @@ const Page = () => {
                 </Button>
               )}
             </div>
-
           </div>
         </section>
       </div>
