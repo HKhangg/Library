@@ -7,9 +7,11 @@ import com.library_web.library.repository.UserRepository;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.UserMessage;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-
+import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -36,10 +38,12 @@ public class ChatMemoryService {
         return chatMessageRepository.findByUser_IdOrderByTimestampAsc(userId);
     }
 
+    @Transactional
     public void clearChatHistory(Long userId) {
         chatMessageRepository.deleteByUser_Id(userId);
     }
 
+    @Transactional
     private void saveMessage(Long userId, String role, String content) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy user với ID: " + userId));
@@ -83,18 +87,47 @@ public class ChatMemoryService {
         return "user_" + userId + "_session_" + nextNum;
     }
 
+
     public List<dev.langchain4j.data.message.ChatMessage> getHistoryAsLangChainMessages(Long userId) {
-        return getChatHistory(userId).stream()
+        Pageable limit = PageRequest.of(0, 11);
+        List<ChatMessage> history = chatMessageRepository.findByUser_IdOrderByTimestampDesc(userId, limit);
+        List<dev.langchain4j.data.message.ChatMessage> messages = history.stream()
                 .map(msg -> "USER".equalsIgnoreCase(msg.getRole())
-                        ? UserMessage.from(msg.getMessage())
-                        : AiMessage.from(msg.getMessage()))
+                        ? dev.langchain4j.data.message.UserMessage.from(msg.getMessage())
+                        : dev.langchain4j.data.message.AiMessage.from(msg.getMessage()))
                 .collect(Collectors.toList());
-    }
+        java.util.Collections.reverse(messages);
+            if (!messages.isEmpty()) {
+                dev.langchain4j.data.message.ChatMessage lastMessage = messages.get(messages.size() - 1);
+                if (lastMessage instanceof dev.langchain4j.data.message.UserMessage) {
+                    messages.remove(messages.size() - 1);
+                }
+            }
+
+            return messages;
+        }
     
+    @Transactional
     @Scheduled(cron = "0 0 3 * * *")
     public void deleteOldMessages() {
         LocalDateTime cutoff = LocalDateTime.now().minusMonths(1);
         chatMessageRepository.deleteAllByTimestampBefore(cutoff);
         System.out.println("Đã dọn dẹp các chat_message cũ hơn 1 tháng rồi á.");
+    }
+
+    public void clearHistory(Long userId) {
+        clearChatHistory(userId);
+    }
+
+    @Transactional
+    public void removeLastNMessages(Long userId, int n) {
+        if (n <= 0) return;
+        Pageable limit = PageRequest.of(0, n);
+        List<ChatMessage> lastMessages = chatMessageRepository.findByUser_IdOrderByTimestampDesc(userId, limit);
+        
+        if (!lastMessages.isEmpty()) {
+            chatMessageRepository.deleteAll(lastMessages);
+            System.out.println("DEBUG: Đã xóa " + lastMessages.size() + " tin nhắn cuối của user " + userId );
+        }
     }
 }

@@ -1,190 +1,215 @@
 "use client";
-import React from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import Sidebar from "../components/sidebar/Sidebar";
-import { History, Search, Plus, IndentIncrease, BookOpen } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { BookCheck, History, List, Search, TimerOff } from "lucide-react";
+import { useRouter, useSearchParams, usePathname } from "next/navigation"; // Import hooks
 import { Button } from "@/app/components/ui/button";
-import useSidebarStore from "@/store/sideBarStore";
+import toast, { Toaster } from "react-hot-toast";
+import { ThreeDot } from "react-loading-indicators";
+import { Input } from "../components/ui/input";
+import useSWR from "swr";
+import { fetcher } from "@/lib/fetcher";
+
 const Page = () => {
   const router = useRouter();
-  const { isSidebarOpen } = useSidebarStore();
-  const handleDetail = (id) => {
-    router.push(`/return/${id}`);
-  };
-  const handleReturn = () => {
-    router.push(`/return`);
-  };
-  const handleBorrow = () => {
-    router.push(`/borrow`);
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+
+  // Lấy trạng thái từ URL
+  const searchQuery = searchParams.get("query") || "";
+  const currentPage = Number(searchParams.get("page")) || 1;
+  const itemsPerPage = 10;
+
+  const [localSearch, setLocalSearch] = useState(searchQuery);
+
+  useEffect(() => {
+    setLocalSearch(searchQuery);
+  }, [searchQuery]);
+
+  // Fetch Data
+  const { data: allBorrowCards = [], isLoading } = useSWR(
+    `${process.env.NEXT_PUBLIC_API_URL}/api/borrow-cards`,
+    fetcher,
+    {
+      revalidateOnFocus: true,
+      dedupingInterval: 60000,
+      onError: (err) => {
+        console.error("Lỗi tải dữ liệu:", err);
+        toast.error("Không thể tải danh sách phiếu trả.");
+      },
+    }
+  );
+
+  // Helper cập nhật URL
+  const updateURL = (key, value) => {
+    const params = new URLSearchParams(searchParams);
+    if (value) params.set(key, value);
+    else params.delete(key);
+
+    if (key === "query") params.set("page", 1);
+
+    router.replace(`${pathname}?${params.toString()}`);
   };
 
-  // 🔹 Mock data (giả lập dữ liệu từ backend)
-  const mockData = {
-    7: {
-      MaPhieuMuon: 7,
-      MaNguoiDung: 20,
-      TenNguyoiDung: "Nguyen Thanh Tri",
-      NgayMuon: "09/03/2025",
-      NgayTra: "23/03/2025",
-      Sach: [
-        {
-          MaSach: "id sach1",
-          TenSach: "Tên sách 1",
-          MoTa: "Mo ta mau",
-          MaTheLoai: "ma the loai",
-          MaTacGia: "ma tac gia",
-          HinhAnh: ["/test.webp", "3133331", "313213131", "31313123"],
-          SoLuongTon: 70,
-          SoLuongMuon: 1,
-        },
-        {
-          MaSach: "id sach2",
-          TenSach: "Tên sách 2",
-          MoTa: "Mo ta mau",
-          MaTheLoai: "ma the loai",
-          MaTacGia: "ma tac gia",
-          HinhAnh: ["/test.webp", "3133331", "313213131", "31313123"],
-          SoLuongTon: 70,
-          SoLuongMuon: 2,
-        },
-        {
-          MaSach: "id sach3",
-          TenSach: "Tên sách 3",
-          MoTa: "Mo ta mau",
-          MaTheLoai: "ma the loai",
-          MaTacGia: "ma tac gia",
-          HinhAnh: ["/test.webp", "3133331", "313213131", "31313123"],
-          SoLuongTon: 70,
-          SoLuongMuon: 3,
-        },
-      ],
-    },
-    8: {
-      MaPhieuMuon: 8,
-      MaNguoiDung: 18,
-      TenNguyoiDung: "Le Thi Thuy Trang",
-      NgayMuon: "09/03/2025",
-      NgayTra: "16/03/2025",
-      Sach: [
-        {
-          MaSach: "id sach1",
-          TenSach: "Tên sách 1",
-          MoTa: "Mo ta mau",
-          MaTheLoai: "ma the loai",
-          MaTacGia: "ma tac gia",
-          HinhAnh: ["/test.webp", "3133331", "313213131", "31313123"],
-          SoLuongTon: 70,
-          SoLuongMuon: 1,
-        },
-        {
-          MaSach: "id sach2",
-          TenSach: "Tên sách 2",
-          MoTa: "Mo ta mau",
-          MaTheLoai: "ma the loai",
-          MaTacGia: "ma tac gia",
-          HinhAnh: ["/test.webp", "3133331", "313213131", "31313123"],
-          SoLuongTon: 70,
-          SoLuongMuon: 2,
-        },
-      ],
-    },
-    9: {
-      MaPhieuMuon: 9,
-      MaNguoiDung: 71,
-      TenNguyoiDung: "Nguyen Le Thanh Huyen",
-      NgayMuon: "10/03/2025",
-      NgayTra: "17/03/2025",
-      Sach: [
-        {
-          MaSach: "id sach1",
-          TenSach: "Tên sách 1",
-          MoTa: "Mo ta mau",
-          MaTheLoai: "ma the loai",
-          MaTacGia: "ma tac gia",
-          HinhAnh: ["/test.webp", "3133331", "313213131", "31313123"],
-          SoLuongTon: 70,
-          SoLuongMuon: 1,
-        },
-      ],
-    },
+  // Logic Lọc
+  const filteredCards = useMemo(() => {
+    let result = allBorrowCards.filter(
+      (c) => c.status === "Đã trả" || c.status === "RETURNED"
+    );
+
+    if (searchQuery.trim()) {
+      const lowerQuery = searchQuery.toLowerCase();
+      result = result.filter(
+        (card) =>
+          card.id.toString().includes(lowerQuery) ||
+          card.userId.toString().includes(lowerQuery)
+      );
+    }
+    return result;
+  }, [allBorrowCards, searchQuery]);
+
+  const totalPages = Math.ceil(filteredCards.length / itemsPerPage) || 1;
+  const paginatedCards = filteredCards.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  // Handlers
+  const handleDetail = (id) => {
+    // Khi push sang trang chi tiết, URL hiện tại được lưu trong history
+    router.push(`/return/${id}`);
+  };
+
+  const handleBorrow = () => {
+    router.push(`/borrow`); 
+  };
+
+  const handlePageChange = (page) => {
+    if (page >= 1 && page <= totalPages) {
+      updateURL("page", page);
+    }
+  };
+
+  const handleSearchSubmit = () => {
+    updateURL("query", localSearch);
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return "N/A";
+    const date = new Date(dateString);
+    return date.toLocaleDateString("vi-VN");
   };
 
   return (
-    <div className="flex flex-row w-full max-w- h-screen bg-[#F4F7FE]">
+    <div className="flex flex-row w-full min-h-screen bg-[#EFF3FB]">
+      <Toaster position="top-center" reverseOrder={false} />
       <Sidebar />
-      <div
-        className={`flex-1 py-6 px-10 transition-all duration-300 ${
-          isSidebarOpen ? "md:ml-64" : "md:ml-0"
-        }`}
-      >
-        <div className="flex flex-col w-full p-6">
-          {/* Thanh công cụ */}
-          <div className="flex items-center justify-between bg-white p-4 rounded-lg shadow-md">
-            <button
-              className="flex justify-center items-center w-80 gap-2 bg-blue-200 text-gray-700 font-bold py-2 px-4 rounded-full"
-              onClick={() => handleBorrow()}
-            >
-              <BookOpen className="w-5 h-5 text-gray-600" />
-              Đang Mượn
-            </button>
-            <button
-              className="flex justify-center items-center w-80 gap-2 bg-blue-400 text-white font-bold py-2 px-4 rounded-full"
-              onClick={() => handleReturn()}
-            >
-              <span className="text-xs font-semibold bg-white text-blue-400 px-2 py-1 rounded-full">
-                NOW
-              </span>
-              <History className="w-5 h-5 text-white" />
-              Đã Trả
-            </button>
-            <div className="flex items-center border border-gray-300 rounded-full px-3 py-1 bg-white">
-              <input
-                type="text"
-                placeholder="Tìm kiếm..."
-                className="outline-none border-none bg-transparent text-gray-600 px-2"
-              />
-              <button className="text-blue-400">
-                <Search className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-
-          {/* Danh sách mượn */}
-          <div className="flex flex-col w-full gap-6 mt-6">
-            {Object.values(mockData).map((data) => (
-              <div
-                key={data.MaPhieuMuon}
-                className="flex flex-col bg-white rounded-lg shadow-md p-4"
+      <div className="flex-1 py-6 md:ml-52 px-10">
+        <div className="mx-auto">
+          <header className="flex justify-between gap-8 max-lg:gap-3 max-sm:flex-col bg-white p-3 rounded-xl shadow-sm mb-6">
+            {/* Tab Controls (Fake Tabs to Navigation) */}
+            <div className="flex w-2/3 gap-5">
+              <Button
+                className={`flex flex-1 gap-3 justify-center text-white hover:bg-gray-500 items-center text-[1.125rem] font-medium rounded-md py-5 cursor-pointer bg-[#b6cefa]`}
+                onClick={handleBorrow}
               >
-                <div className="flex justify-between items-center">
-                  <div className="flex-1/2">
-                    <p className="text-lg font-semibold">
-                      ID: {data.MaPhieuMuon}
-                    </p>
-                    <p className="text-lg font-semibold">
-                      User ID: {data.MaNguoiDung}
-                    </p>
-                    <p className="font-semibold">Ngày mượn: {data.NgayMuon}</p>
-                    <p className="font-semibold">
-                      Ngày trả dự kiến: {data.NgayTra}
-                    </p>
-                  </div>
-                  <Button
-                    className="flex-1/4 items-center gap-2 bg-[#6CB1DA] text-white px-4 py-2 rounded-md hover:bg-blue-600"
-                    onClick={() => handleDetail(data.MaPhieuMuon)}
-                  >
-                    <IndentIncrease className="w-5 h-5" />
-                    Xem chi tiết
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
+                <BookCheck className="size-6" /> Đang mượn
+              </Button>
 
-          {/* Nút Thêm */}
-          <button className="flex justify-center items-center fixed bottom-4 right-4 w-16 h-16 bg-[#6CB1DA] rounded-full">
-            <Plus className="w-10 h-10 text-white" />
-          </button>
+              <Button
+                className={`flex flex-1 gap-3 justify-center text-white hover:bg-gray-500 items-center text-[1.125rem] font-medium rounded-md py-5 cursor-pointer bg-[#062D76]`}
+              >
+                <TimerOff className="size-6" /> Đã trả
+              </Button>
+            </div>
+
+            {/* Search */}
+            <div className="flex gap-5">
+              <Input
+                type="text"
+                placeholder="Tìm kiếm (ID, UserID)"
+                className="w-full h-10 font-thin italic text-black text-xl bg-gray-50 rounded-[10px]"
+                value={localSearch}
+                onChange={(e) => setLocalSearch(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSearchSubmit()}
+              />
+              <Button
+                className="w-10 h-10 cursor-pointer bg-[#062D76] hover:bg-gray-700 rounded-[10px]"
+                onClick={handleSearchSubmit}
+              >
+                <Search className="w-6 h-6" color="white" />
+              </Button>
+            </div>
+          </header>
+
+          {/* List Content */}
+          <section className="flex flex-col gap-4">
+            {isLoading ? (
+              <div className="flex justify-center py-10">
+                <ThreeDot color="#062D76" size="large" text="Đang tải..." />
+              </div>
+            ) : paginatedCards.length > 0 ? (
+              paginatedCards.map((data) => (
+                <div
+                  key={data.id}
+                  className="flex flex-col bg-white rounded-lg shadow-sm p-5 hover:shadow-md transition-all border border-transparent hover:border-blue-100"
+                >
+                  <div className="flex justify-between items-center">
+                    <div className="flex flex-col gap-1">
+                      <p className="text-lg font-semibold text-[#062D76]">
+                        Mã Phiếu: {data.id}
+                      </p>
+                      <p className="text-gray-600">
+                        Người dùng ID: <span className="font-medium text-black">{data.userId}</span>
+                      </p>
+                      <p className="text-gray-500 text-sm">
+                        Ngày mượn: {formatDate(data.borrowDate)}
+                      </p>
+                      <p className="text-green-600 font-medium text-sm">
+                        Ngày trả thực tế: {formatDate(data.dueDate)}
+                      </p>
+                    </div>
+
+                    <Button
+                      className="flex items-center gap-2 bg-[#062D76] text-white px-4 py-2 rounded-lg hover:bg-blue-800 transition-colors"
+                      onClick={() => handleDetail(data.id)}
+                    >
+                      <List className="w-5 h-5" />
+                      Xem chi tiết
+                    </Button>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-10 text-gray-500 bg-white rounded-xl">
+                <History className="w-16 h-16 mx-auto mb-4 opacity-20" />
+                <p>Chưa có phiếu trả nào được ghi nhận.</p>
+              </div>
+            )}
+          </section>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex justify-center items-center gap-2 mt-8">
+              <Button
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="bg-[#062D76] hover:bg-gray-700 text-white disabled:opacity-50"
+              >
+                Trước
+              </Button>
+              <span className="px-4 py-2 bg-white rounded shadow-sm text-[#062D76] font-medium">
+                Trang {currentPage} / {totalPages}
+              </span>
+              <Button
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className="bg-[#062D76] hover:bg-gray-700 text-white disabled:opacity-50"
+              >
+                Sau
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     </div>

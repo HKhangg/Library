@@ -1,7 +1,8 @@
 package com.library_web.library.chat.tool;
 
+import com.library_web.library.model.Book;
+import com.library_web.library.service.BookService;
 import dev.langchain4j.agent.tool.Tool;
-import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.rag.content.Content;
 import dev.langchain4j.rag.content.retriever.ContentRetriever;
 import dev.langchain4j.rag.query.Query;
@@ -10,70 +11,61 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Component
-public class BookTool2 { 
+public class BookTool2 {
 
     @Autowired
-    @Qualifier("bookRetriever") 
+    @Qualifier("bookRetriever")
     private ContentRetriever bookRetriever;
 
-    @Tool("PHIÊN BẢN 2 (Dùng RAG từ CSV): Dùng tool này để TÌM KIẾM SÁCH theo tên sách, tác giả, mô tả, chủ đề, hoặc từ khóa (ví dụ: 'sách về robot mèo màu xanh', 'sách của Nguyễn Nhật Ánh', 'sách kinh doanh'). Input là một câu truy vấn.")
-    public String findBookV2(String query) { 
-        if (query == null || query.trim().isEmpty()) {
-            return "Bạn muốn tìm sách gì á?";
-        }
+    @Autowired
+    private BookService bookService; 
 
-        String searchTerm = query.trim();
+    @Tool("PHIÊN BẢN 2 (RAG + Verification): Dùng tool này KHI VÀ CHỈ KHI người dùng muốn TÌM KIẾM cuốn sách CỤ THỂ, RÕ RÀNG (biết tên, biết tác giả, hoặc MÔ TẢ NỘI DUNG hay TỪ KHÓA khi người dùng không nhớ rõ (Plot/Content)). VÍ DỤ: 'tìm cuốn Mắt Biếc', 'sách của Nguyễn Nhật Ánh', 'sách về lập trình Java', 'sách về chú mèo máy', 'sách nói về chiến tranh biên giới'. TUYỆT ĐỐI KHÔNG dùng cho các câu hỏi xin lời khuyên, tâm sự hoặc gợi ý chung chung.")
+    public String findBookV2(String query) {
+        if (query == null || query.trim().isEmpty()) return "Bạn muốn tìm sách gì á?";
 
         try {
-            Query bookQuery = Query.from(searchTerm);
-            List<Content> retrievedContents = bookRetriever.retrieve(bookQuery);
 
+            List<Content> retrievedContents = bookRetriever.retrieve(Query.from(query.trim()));
             if (retrievedContents.isEmpty()) {
-                return "Xin lỗi, tui không tìm thấy cuốn sách nào khớp với '" + searchTerm + "' trong thư viện hết á.";
+                return "Xin lỗi, tui không tìm thấy cuốn sách nào khớp với '" + query + "'.";
             }
-            
-            List<FoundBook> foundBooks = retrievedContents.stream()
+            List<Long> potentialIds = retrievedContents.stream()
                 .map(Content::textSegment)
                 .filter(Objects::nonNull)
-                .map(segment -> {
-                    String id = segment.metadata().getString("ma_sach");
-                    String name = segment.metadata().getString("ten_sach");
-                    String description = segment.text();
-                    
-                    Long bookId = (id != null && !id.isBlank()) ? Long.parseLong(id) : null;
-                    return (bookId != null && name != null) ? new FoundBook(bookId, name, description) : null;
-                })
-                .filter(Objects::nonNull)
-                .distinct() 
+                .map(seg -> seg.metadata().getString("ma_sach"))
+                .filter(id -> id != null && !id.isBlank())
+                .map(Long::parseLong)
+                .distinct()
                 .toList();
 
-             if (foundBooks.isEmpty()) {
-                 return "Tui tìm thấy vài thông tin liên quan đến '" + searchTerm + "' nhưng chưa xác định được sách cụ thể nào.";
-             }
-            if (foundBooks.size() == 1) {
-                FoundBook foundBook = foundBooks.get(0);
-                
-                return "Okela, tui tìm thấy đúng 1 cuốn khớp là: '" + foundBook.name() + "' (ID sách là: " + foundBook.id() + ").\n"
-                     + "Mô tả: " + foundBook.description(); 
+            if (potentialIds.isEmpty()) return "Tui tìm thấy thông tin nhưng không xác định được mã sách.";
+            List<Book> verifiedBooks = bookService.getBooksByListIds(potentialIds).stream()
+                .filter(b -> b.getTrangThai() != Book.TrangThai.DA_XOA)
+                .toList();
 
+            if (verifiedBooks.isEmpty()) {
+                return "Tui tìm thấy sách trong dữ liệu nhưng hiện tại trong kho thư viện đã không còn (hoặc bị xóa).";
+            }
+            String examples = verifiedBooks.stream()
+                .limit(5) 
+                .map(b -> "'" + b.getTenSach() + "' (ID: " + b.getMaSach() + ")")
+                .collect(Collectors.joining(", "));
+
+            if (verifiedBooks.size() == 1) {
+                 return "Tui tìm thấy đúng 1 cuốn khớp nè: " + examples + ".";
             } else {
-                String examples = foundBooks.stream()
-                                    .limit(3) 
-                                    .map(book -> "'" + book.name() + "' (ID: " + book.id() + ")")
-                                    .collect(Collectors.joining(", "));
-                return "Okela, tui tìm thấy tổng cộng " + foundBooks.size() + " cuốn sách khớp lận á! Ví dụ như: " + examples + ". Bạn muốn tui liệt kê hết tên sách ra hong?";
+                 return "Tui tìm thấy khoảng " + verifiedBooks.size() + " cuốn khớp với yêu cầu của bạn nè. Ví dụ: " + examples + ". Bạn muốn xem chi tiết cuốn nào?";
             }
 
         } catch (Exception e) {
-            System.err.println("Lỗi nghiêm trọng trong BookTool2.findBookV2 (RAG): " + e.getMessage());
             e.printStackTrace();
-            return "Ui, hệ thống tìm kiếm sách đang bị lỗi chút xíu. Bạn thử lại sau giúp tui nha!";
+            return "Ui, lỗi hệ thống tìm kiếm rồi: " + e.getMessage();
         }
     }
-
-    private record FoundBook(Long id, String name, String description) {}
 }

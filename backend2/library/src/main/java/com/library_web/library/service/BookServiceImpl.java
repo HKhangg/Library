@@ -1,5 +1,6 @@
 package com.library_web.library.service;
 
+//import com.library_web.library.chat.service.BookEnrichmentService;
 import com.library_web.library.model.Book;
 import com.library_web.library.model.BookChild;
 import com.library_web.library.model.BorrowCard;
@@ -17,6 +18,7 @@ import com.library_web.library.repository.BorrowCardRepository;
 import jakarta.transaction.Transactional;
 
 //import org.springframework.beans.factory.annotation.Autowired;
+//import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -33,8 +35,8 @@ public class BookServiceImpl implements BookService {
 
     // private final CategoryRepository categoryRepo;
     private final CategoryChildRepository childRepo;
-    // @Autowired
-    // private EmbeddingModel embeddingModel;
+    //@Autowired
+    //private EmbeddingModel embeddingModel;
 
     /*
      * private String buildBookTextForEmbedding(Book b) {
@@ -58,6 +60,18 @@ public class BookServiceImpl implements BookService {
         this.childRepo = childRepo;
         this.bookChildRepository = bookChildRepository;
         this.borrowCardRepository = borrowCardRepository;
+    }
+
+    public List<Book> getBooksByListIds(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) return new ArrayList<>();
+        return repo.findAllByMaSachIn(ids);
+    }
+
+    
+    @Override
+    public List<Book> getBooksByListCategoryChildIds(List<String> ids) {
+        if (ids == null || ids.isEmpty()) return new ArrayList<>();
+        return repo.findByCategoryChild_IdIn(ids); 
     }
 
     @Override
@@ -143,6 +157,7 @@ public class BookServiceImpl implements BookService {
         }
         saved.setTongSoLuong(initialQuantity);
         saved.updateTrangThai();
+       // bookEnrichmentService.enrichAndIngestBook(saved);
         return repo.save(saved);
     }
 

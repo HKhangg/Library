@@ -37,7 +37,6 @@ const SendIcon = () => (
   </svg>
 );
 
-
 const ChatInput = ({ message, onMessageChange, onSend }) => {
   return (
     <footer className="flex gap-3 items-center p-1.5 bg-white">

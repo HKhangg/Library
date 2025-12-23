@@ -44,7 +44,10 @@ const Chat = () => {
   return (
     <main className="absolute sm:bottom-[1rem] sm:right-[3.125rem] flex-col items-start rounded-xl shadow-lg h-auto w-[330px]">
       <ChatHeader />
-      <section className="flex-1 w-full overflow-y-auto max-h-[340px] bg-slate-200">
+      <section
+        className="flex-1 w-full overflow-y-auto max-h-[340px]"
+        style={{ background: "oklch(0.145 0 0)" }}
+      >
         <div className="flex flex-col gap-3 p-3">
           {messages.map((msg) => (
             <ChatMessage

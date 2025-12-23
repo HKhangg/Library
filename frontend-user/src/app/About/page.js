@@ -29,7 +29,7 @@ import {   Instagram } from "lucide-react";
 const contacts = [
     { name: "Email", icon: Mail, link: "mailto:23521468@uit.edu.vn" },
     { name: "GitHub", icon: Github, link: "https://github.com/PhTee2412" },
-    { name: "Instagram", icon: Instagram, link: "https://instagram.com" },
+    { name: "Instagram", icon: Instagram, link: "https://instagram.com/" },
   ];
 /* ---------- Data ---------- */
 const features = [

@@ -4,31 +4,29 @@ import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { ArrowUpFromLine, ChevronDown, CircleCheck, Undo2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import React, { useEffect, useRef, useState } from "react";
-
-
-
-import toast from "react-hot-toast";
+import React, { useRef, useState, useMemo } from "react";
+import toast, { Toaster } from "react-hot-toast";
 import { ThreeDot } from "react-loading-indicators";
 import axios from "axios";
 
+import useSWR from "swr";
+import { fetcher } from "@/lib/fetcher"; 
+
 function Page() {
-  const [loading, setLoading] = useState(false);
-  const route = useRouter();
-  const handleGoBack = () => {
-    route.back();
-  };
+  const router = useRouter();
+
   const [bookname, setBookname] = useState("");
   const [author, setAuthor] = useState("");
   const [publisher, setPublisher] = useState("");
   const [year, setYear] = useState("");
   const [quantity, setQuantity] = useState("");
   const [description, setDescription] = useState("");
-  const [category, setCategory] = useState("");
-  const [category2, setCategory2] = useState("");
+  const [category, setCategory] = useState(""); // Tên thể loại chính
+  const [category2, setCategory2] = useState(""); // Tên thể loại phụ
   const [weight, setWeight] = useState("");
   const [price, setPrice] = useState("");
 
+  // Refs & Images
   const fileInputRef = useRef(null);
   const fileInputRef1 = useRef(null);
   const fileInputRef2 = useRef(null);
@@ -39,59 +37,51 @@ function Page() {
     { filePreview: null, selectedFile: null },
     { filePreview: null, selectedFile: null },
   ]);
-  const [totalCate, setTotalCate] = useState([]);
-  const [cateList, setCateList] = useState([]);
-  const [cate2List, setCate2List] = useState([]);
 
-  useEffect(() => {
-    const fetchCategory = async () => {
-      try {
-        const response = await axios.get(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/category`
-        );
-        const data = response.data;
-        setTotalCate(data);
-        setCateList(data.map((item) => item.name));
-      } catch (error) {
-        console.error("Error fetching categories:", error);
-        window.alert("Không thể tải danh mục");
-      }
-    };
-    fetchCategory();
-  }, []);
-
-  useEffect(() => {
-    if (category !== "") {
-      const selectedCate = totalCate.find((cate) => cate.name === category);
-      if (selectedCate) {
-        setCate2List(selectedCate.children.map((child) => child.name));
-      } else {
-        setCate2List([]);
-      }
-      setCategory2("");
-    }
-  }, [category, totalCate]);
-
+  // Dropdown UI State
   const [isCateListOpen, setIsCateListOpen] = useState(false);
   const [isCateList2Open, setIsCateList2Open] = useState(false);
-  const openCategoryList = () => {
-    setIsCateListOpen(!isCateListOpen);
-  };
-  const openCategory2List = () => {
-    setIsCateList2Open(!isCateList2Open);
+
+  // useSWR: Lấy danh sách danh mục (Thay thế useEffect cũ)
+  const { data: totalCate = [], isLoading: loadingCategories } = useSWR(
+    `${process.env.NEXT_PUBLIC_API_URL}/api/category`,
+    fetcher,
+    {
+      revalidateOnFocus: false, // Danh mục ít thay đổi
+      dedupingInterval: 60000,
+    }
+  );
+
+  // Derived State: Tạo danh sách tên thể loại chính
+  const cateList = useMemo(() => totalCate.map((item) => item.name), [totalCate]);
+
+  // Derived State: Tự động lọc danh sách thể loại phụ 
+  const cate2List = useMemo(() => {
+    if (!category) return [];
+    const selectedCate = totalCate.find((cate) => cate.name === category);
+    if (selectedCate && selectedCate.children) {
+      return selectedCate.children.map((child) => child.name);
+    }
+    return [];
+  }, [category, totalCate]);
+
+  const handleGoBack = () => {
+    router.back();
   };
 
   const handleFileChange = (number, event) => {
     const file = event.target.files[0];
-    setImage((prev) => {
-      const updated = [...prev];
-      updated[number] = {
-        ...updated[number],
-        filePreview: URL.createObjectURL(file),
-        selectedFile: file,
-      };
-      return updated;
-    });
+    if (file) {
+      setImage((prev) => {
+        const updated = [...prev];
+        updated[number] = {
+          ...updated[number],
+          filePreview: URL.createObjectURL(file),
+          selectedFile: file,
+        };
+        return updated;
+      });
+    }
   };
 
   const uploadImagesToCloudinary = async () => {
@@ -101,85 +91,60 @@ function Page() {
         formData.append("files", img.selectedFile);
       }
     });
-    try {
-      const res = await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/upload/image`,
-        formData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        }
-      );
-      return res.data;
-    } catch (error) {
-      console.error("Error uploading images:", error);
-      window.alert("Upload hình ảnh thất bại");
-      throw error;
-    }
-  };
-  const handleValidation = () => {
-    const newErrors = { ...errors };
-    newErrors.bookname = !bookname;
-    newErrors.author = !author;
-    newErrors.publisher = !publisher;
-    newErrors.year = !year;
-    newErrors.quantity = !quantity || parseInt(quantity) < 1;
-    newErrors.description = !description;
-    newErrors.category = !category;
-    newErrors.category2 = !category2;
 
-    setErrors(newErrors);
-    return !Object.values(newErrors).includes(true);
+    const res = await axios.post(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/upload/image`,
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
+    return res.data;
   };
 
   const handleSubmit = async () => {
+    // Validation cơ bản với Toast
     if (
-      bookname === "" ||
-      author === "" ||
-      year === "" ||
-      publisher === "" ||
-      description === "" ||
-      category === "" ||
-      category2 === "" ||
-      quantity === ""
+      !bookname || !author || !year || !publisher ||
+      !description || !category || !category2 || !quantity
     ) {
-      window.alert("Vui lòng điền đầy đủ thông tin");
+      toast.error("Vui lòng điền đầy đủ thông tin");
       return;
     }
     if (parseInt(quantity) < 1) {
-      window.alert("Số lượng sách phải lớn hơn 0");
+      toast.error("Số lượng sách phải lớn hơn 0");
       return;
     }
-    if (weight === "" || isNaN(+weight) || +weight <= 0) {
-      window.alert("Nhập trọng lượng (> 0)");
+    if (!weight || isNaN(+weight) || +weight <= 0) {
+      toast.error("Nhập trọng lượng hợp lệ (> 0)");
       return;
     }
-    if (price === "" || isNaN(+price) || +price <= 0) {
-      window.alert("Nhập đơn giá (> 0)");
+    if (!price || isNaN(+price) || +price <= 0) {
+      toast.error("Nhập đơn giá hợp lệ (> 0)");
       return;
     }
 
-    setLoading(true);
+    const toastId = toast.loading("Đang xử lý dữ liệu...");
+
     try {
+      // Upload ảnh
       let finalImageURLs = [];
       if (image.some((img) => img.selectedFile)) {
         const newImages = await uploadImagesToCloudinary();
         finalImageURLs = newImages;
       }
 
+      // Tìm ID danh mục
       const selectedParent = totalCate.find((cate) => cate.name === category);
-      if (!selectedParent) {
-        window.alert("Thể loại chính không hợp lệ");
-        return;
-      }
+      if (!selectedParent) throw new Error("Thể loại chính không hợp lệ");
+
       const selectedChild = selectedParent.children.find(
         (child) => child.name === category2
       );
-      if (!selectedChild) {
-        window.alert("Thể loại phụ không hợp lệ");
-        return;
-      }
+      if (!selectedChild) throw new Error("Thể loại phụ không hợp lệ");
+
       const childId = selectedChild.id;
 
       const bookData = {
@@ -198,49 +163,55 @@ function Page() {
         quantity: parseInt(quantity),
       };
 
-      console.log("bookData gửi lên:", bookData);
-
+      // Gọi API tạo sách
       const res = await axios.post(
         `${process.env.NEXT_PUBLIC_API_URL}/api/book`,
         bookData
       );
-      window.alert("Thêm sách thành công");
+
+      toast.success("Thêm sách thành công!", { id: toastId });
       const newId = res.data.maSach;
-      route.push(`/books/details/${newId}`);
+
+      // Delay một chút để người dùng đọc thông báo trước khi chuyển trang
+      setTimeout(() => {
+        router.push(`/books/details/${newId}`);
+      }, 1000);
+
     } catch (error) {
-      console.error("Lỗi:", error.message);
-      window.alert("Thêm sách thất bại");
-    } finally {
-      setLoading(false);
+      console.error("Lỗi:", error);
+      const msg = error.response?.data?.message || error.message || "Thêm sách thất bại";
+      toast.error(msg, { id: toastId });
     }
   };
 
   return (
     <div className="flex flex-row w-full h-full min-h-screen bg-[#EFF3FB] pb-15">
+      <Toaster position="top-center" reverseOrder={false} />
       <Sidebar />
-      {loading ? (
+      {loadingCategories ? (
         <div className="flex md:ml-52 w-full h-screen justify-center items-center">
           <ThreeDot
             color="#062D76"
             size="large"
-            text="Vui lòng chờ"
+            text="Đang tải danh mục..."
             variant="bounce"
             textColor="#062D76"
           />
         </div>
       ) : (
         <div className="flex w-full flex-col py-6 md:ml-52 relative mt-10 gap-2 items-center px-10">
-          {/*Nút Back*/}
-          <div className="absolute top-5 left-5 md:left-57 fixed">
+          {/* Nút Quay Lại */}
+          <div className="absolute top-5 left-5 md:left-57 fixed z-10">
             <Button
               title={"Quay Lại"}
-              className="bg-[#062D76] rounded-3xl w-10 h-10"
+              className="bg-[#062D76] rounded-3xl w-10 h-10 hover:bg-gray-700"
               onClick={handleGoBack}
             >
               <Undo2 className="w-12 h-12" color="white" />
             </Button>
           </div>
-          {/*Dòng tên sách*/}
+
+          {/* Form Input */}
           <div className="flex flex-col w-full gap-[5px] md:gap-[10px]">
             <p className="font-semibold text-lg mt-3">
               Tên Sách<span className="text-red-500"> *</span>
@@ -253,7 +224,7 @@ function Page() {
               onChange={(e) => setBookname(e.target.value)}
             />
           </div>
-          {/*Dòng tên tg*/}
+
           <div className="flex flex-col w-full gap-[5px] md:gap-[10px]">
             <p className="font-semibold text-lg mt-3">
               Tên Tác Giả<span className="text-red-500"> *</span>
@@ -266,7 +237,7 @@ function Page() {
               onChange={(e) => setAuthor(e.target.value)}
             />
           </div>
-          {/*Dòng năm xuất bản và nhà xuất bản */}
+
           <div className="flex w-full justify-between gap-10">
             <div className="flex flex-col w-2/3 gap-[5px] md:gap-[10px]">
               <p className="font-semibold text-lg mt-3">
@@ -293,7 +264,7 @@ function Page() {
               />
             </div>
           </div>
-          {/*Dòng số lượng và thể loại */}
+
           <div className="flex w-full justify-between gap-10">
             <div className="flex flex-col w-2/3 gap-[5px] md:gap-[10px]">
               <p className="font-semibold text-lg mt-3">
@@ -307,6 +278,7 @@ function Page() {
                 onChange={(e) => setQuantity(e.target.value)}
               />
             </div>
+            {/* Dropdown Thể Loại Chính */}
             <div className="flex flex-col w-full gap-[5px] md:gap-[10px] space-y-2 relative inline-block text-left">
               <p className="font-semibold text-lg mt-3">
                 Thể Loại Chính<span className="text-red-500"> *</span>
@@ -314,19 +286,20 @@ function Page() {
               <Button
                 title={"Thể Loại Chính"}
                 className="bg-white text-black rounded-lg w-full h-10 hover:bg-gray-300 flex justify-between"
-                onClick={openCategoryList}
+                onClick={() => setIsCateListOpen(!isCateListOpen)}
               >
                 {category !== "" ? category : "Chọn Thể Loại Chính"}
                 <ChevronDown className="w-12 h-12" color="#062D76" />
               </Button>
               {isCateListOpen && (
-                <div className="absolute bg-white rounded-lg w-full z-50 shadow-lg">
+                <div className="absolute bg-white rounded-lg w-full z-50 shadow-lg max-h-60 overflow-y-auto">
                   {cateList?.map((cate, index) => (
                     <Button
                       key={index}
                       className="flex justify-start block w-full px-4 py-2 text-left bg-white text-black hover:bg-gray-300 items-center gap-2"
                       onClick={() => {
                         setCategory(cate);
+                        setCategory2(""); // Reset thể loại phụ
                         setIsCateListOpen(false);
                       }}
                     >
@@ -336,7 +309,7 @@ function Page() {
                 </div>
               )}
             </div>
-            {/*Thể loại 2*/}
+            {/* Dropdown Thể Loại Phụ */}
             <div className="flex flex-col w-full gap-[5px] md:gap-[10px] space-y-2 relative inline-block text-left">
               <p className="font-semibold text-lg mt-3">
                 Thể Loại Phụ<span className="text-red-500"> *</span>
@@ -344,25 +317,30 @@ function Page() {
               <Button
                 title={"Thể Loại Phụ"}
                 className="bg-white text-black rounded-lg w-full h-10 hover:bg-gray-300 flex justify-between"
-                onClick={openCategory2List}
+                onClick={() => setIsCateList2Open(!isCateList2Open)}
+                disabled={!category} // Vô hiệu hóa nếu chưa chọn cha
               >
                 {category2 !== "" ? category2 : "Chọn Thể Loại Phụ"}
                 <ChevronDown className="w-12 h-12" color="#062D76" />
               </Button>
               {isCateList2Open && (
-                <div className="absolute bg-white rounded-lg w-full z-50 shadow-lg">
-                  {cate2List?.map((cate, index) => (
-                    <Button
-                      key={index}
-                      className="flex justify-start block w-full px-4 py-2 text-left bg-white text-black hover:bg-gray-300 items-center gap-2"
-                      onClick={() => {
-                        setCategory2(cate);
-                        setIsCateList2Open(false);
-                      }}
-                    >
-                      {cate}
-                    </Button>
-                  ))}
+                <div className="absolute bg-white rounded-lg w-full z-50 shadow-lg max-h-60 overflow-y-auto">
+                  {cate2List.length > 0 ? (
+                    cate2List.map((cate, index) => (
+                      <Button
+                        key={index}
+                        className="flex justify-start block w-full px-4 py-2 text-left bg-white text-black hover:bg-gray-300 items-center gap-2"
+                        onClick={() => {
+                          setCategory2(cate);
+                          setIsCateList2Open(false);
+                        }}
+                      >
+                        {cate}
+                      </Button>
+                    ))
+                  ) : (
+                    <p className="p-2 text-gray-500 text-center">Không có danh mục con</p>
+                  )}
                 </div>
               )}
             </div>
@@ -395,7 +373,6 @@ function Page() {
             </div>
           </div>
 
-          {/*Dòng mô tả*/}
           <div className="flex flex-col w-full gap-[5px] md:gap-[10px]">
             <p className="font-semibold text-lg mt-3">
               Mô Tả<span className="text-red-500"> *</span>
@@ -408,138 +385,59 @@ function Page() {
               onChange={(e) => setDescription(e.target.value)}
             />
           </div>
-          {/*Dòng hình ảnh*/}
+
           <div className="flex flex-col w-full gap-[5px] md:gap-[10px]">
             <p className="font-semibold text-lg mt-3">Hình ảnh</p>
             <div className="grid grid-cols-4 gap-4">
-              {/*Cột ảnh bìa*/}
-              <div className="flex flex-col space-y-3">
-                {image[0].filePreview ? (
-                  <img
-                    src={image[0].filePreview}
-                    className="w-[290px] h-[410px] rounded-lg"
-                    width={145}
-                    height={205}
-                    alt={"Ảnh Bìa"}
-                  />
-                ) : (
-                  <div className="w-[290px] h-[410px] bg-gray-300 rounded-lg flex justify-center items-center text-gray-700">
-                    Không có hình ảnh
-                  </div>
-                )}
-                <Button
-                  className="flex w-[290px] bg-[#062D76]"
-                  onClick={() => fileInputRef.current.click()}
-                >
-                  <ArrowUpFromLine className="w-12 h-12" color="white" />
-                  Tải Ảnh Bìa
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden input-new-file"
-                    onChange={(e) => handleFileChange(0, e)}
-                    ref={fileInputRef}
-                  />
-                </Button>
-              </div>
-              {/*Cột ảnh 1*/}
-              <div className="flex flex-col space-y-3">
-                {image[1].filePreview ? (
-                  <img
-                    src={image[1].filePreview}
-                    className="w-[290px] h-[410px] rounded-lg"
-                    width={145}
-                    height={205}
-                    alt={"Ảnh Xem Trước 1"}
-                  />
-                ) : (
-                  <div className="w-[290px] h-[410px] bg-gray-300 rounded-lg flex justify-center items-center text-gray-700">
-                    Không có hình ảnh
-                  </div>
-                )}
-                <Button
-                  className="flex w-[290px] bg-[#062D76]"
-                  onClick={() => fileInputRef1.current.click()}
-                >
-                  <ArrowUpFromLine className="w-12 h-12" color="white" />
-                  Tải Ảnh Xem Trước
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden input-new-file"
-                    onChange={(e) => handleFileChange(1, e)}
-                    ref={fileInputRef1}
-                  />
-                </Button>
-              </div>
-              {/*Cột ảnh 2*/}
-              <div className="flex flex-col space-y-3">
-                {image[2].filePreview ? (
-                  <img
-                    src={image[2].filePreview}
-                    className="w-[290px] h-[410px] rounded-lg"
-                    width={145}
-                    height={205}
-                    alt={"Ảnh Xem Trước 2"}
-                  />
-                ) : (
-                  <div className="w-[290px] h-[410px] bg-gray-300 rounded-lg flex justify-center items-center text-gray-700">
-                    Không có hình ảnh
-                  </div>
-                )}
-                <Button
-                  className="flex w-[290px] bg-[#062D76]"
-                  onClick={() => fileInputRef2.current.click()}
-                >
-                  <ArrowUpFromLine className="w-12 h-12" color="white" />
-                  Tải Ảnh Xem Trước
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden input-new-file"
-                    onChange={(e) => handleFileChange(2, e)}
-                    ref={fileInputRef2}
-                  />
-                </Button>
-              </div>
-              {/*Cột ảnh 3*/}
-              <div className="flex flex-col space-y-3">
-                {image[3].filePreview ? (
-                  <img
-                    src={image[3].filePreview}
-                    className="w-[290px] h-[410px] rounded-lg"
-                    width={145}
-                    height={205}
-                    alt={"Ảnh Xem Trước 3"}
-                  />
-                ) : (
-                  <div className="w-[290px] h-[410px] bg-gray-300 rounded-lg flex justify-center items-center text-gray-700">
-                    Không có hình ảnh
-                  </div>
-                )}
-                <Button
-                  className="flex w-[290px] bg-[#062D76]"
-                  onClick={() => fileInputRef3.current.click()}
-                >
-                  <ArrowUpFromLine className="w-12 h-12" color="white" />
-                  Tải Ảnh Xem Trước
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden input-new-file"
-                    onChange={(e) => handleFileChange(3, e)}
-                    ref={fileInputRef3}
-                  />
-                </Button>
-              </div>
+              {/* Image Inputs Loop */}
+              {[0, 1, 2, 3].map((index) => (
+                <div key={index} className="flex flex-col space-y-3">
+                  {image[index].filePreview ? (
+                    <img
+                      src={image[index].filePreview}
+                      className="w-[290px] h-[410px] rounded-lg object-cover"
+                      alt={`Ảnh ${index === 0 ? "Bìa" : `Xem Trước ${index}`}`}
+                    />
+                  ) : (
+                    <div className="w-[290px] h-[410px] bg-gray-300 rounded-lg flex justify-center items-center text-gray-700">
+                      Không có hình ảnh
+                    </div>
+                  )}
+                  <Button
+                    className="flex w-[290px] bg-[#062D76] hover:bg-gray-700"
+                    onClick={() => {
+                      if (index === 0) fileInputRef.current.click();
+                      else if (index === 1) fileInputRef1.current.click();
+                      else if (index === 2) fileInputRef2.current.click();
+                      else if (index === 3) fileInputRef3.current.click();
+                    }}
+                  >
+                    <ArrowUpFromLine className="w-12 h-12" color="white" />
+                    {index === 0 ? "Tải Ảnh Bìa" : "Tải Ảnh Xem Trước"}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden input-new-file"
+                      onChange={(e) => handleFileChange(index, e)}
+                      ref={
+                        index === 0 ? fileInputRef :
+                          index === 1 ? fileInputRef1 :
+                            index === 2 ? fileInputRef2 :
+                              fileInputRef3
+                      }
+                    />
+                  </Button>
+                </div>
+              ))}
             </div>
           </div>
-          <div className="w-full bottom-0 px-10 left-0 md:left-52 md:w-[calc(100%-208px)] fixed h-18 bg-white flex items-center justify-between">
-            {/*Control Bar*/}
+
+          {/* Footer Controls */}
+          <div className="w-full bottom-0 px-10 left-0 md:left-52 md:w-[calc(100%-208px)] fixed h-18 bg-white flex items-center justify-between z-20 shadow-md">
             <div></div>
             <Button
               title={"Hoàn Tất"}
-              className={`rounded-3xl w-40 h-12 bg-[#062D76]`}
+              className={`rounded-3xl w-40 h-12 bg-[#062D76] hover:bg-gray-700`}
               onClick={handleSubmit}
             >
               <CircleCheck className="w-12 h-12" color="white" />

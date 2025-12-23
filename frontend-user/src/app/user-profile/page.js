@@ -43,7 +43,7 @@ const DatePickerField = ({ value, onChange }) => {
         placeholderText="yyyy-mm-dd"
       />
       <Button
-        className="absolute right-2 h-8 w-8 bg-blue-300 dark:bg-blue-500 
+        className="absolute right-2 h-8 w-8 bg-blue-500 dark:bg-blue-500 
                    hover:bg-blue-400 dark:hover:bg-blue-600 rounded cursor-pointer"
         onClick={() =>
           document
@@ -122,7 +122,7 @@ const InfoRow = ({ label, name, value, isEditing, onChange, isDateField }) => (
     ) : (
       <div className="px-2 py-2 border-b border-black dark:border-gray-600">
         <p className="text-black dark:text-gray-100 text-m font-normal">
-          {value}
+            {value || "Chưa cập nhật"}
         </p>
       </div>
     )}
@@ -475,17 +475,17 @@ const ProfileCard = () => {
             </div>
           )}
           <div className="flex flex-col gap-3">
-            <h2 className="text-neutral-900 text-xl font-lora ">
+            <h2 className="text-neutral-900 dark:text-white text-xl font-lora">
               {formData.fullName}
             </h2>
-            <p className="text-neutral-900 text-opacity-50 text-l font-medium">
+            <p className="text-neutral-900 dark:text-gray-300 text-opacity-50 dark:text-opacity-70 text-l font-medium">
               {formData.email}
             </p>
           </div>
         </div>
         <Button
           onClick={isEditing ? handleSave : toggleEdit}
-          className="w-20 p-3 bg-blue-300 rounded-2xl text-white text-l font-medium hover:bg-blue-400"
+          className="mt-2 w-20 p-3 bg-blue-500 rounded-2xl !text-white text-l font-medium hover:bg-blue-400"
         >
           {isEditing ? "Lưu" : "Sửa"}
         </Button>
@@ -495,7 +495,7 @@ const ProfileCard = () => {
         <InfoRow
           label="Họ và Tên"
           name="fullName"
-          value={formData.fullName || "Chưa cập nhật"}
+          value={formData.fullName}
           isEditing={isEditing}
           onChange={handleChange}
         />
@@ -531,7 +531,7 @@ const ProfileCard = () => {
         <InfoRow
           label="Số Điện Thoại"
           name="phone"
-          value={formData.phone || "Chưa cập nhật"}
+          value={formData.phone}
           isEditing={isEditing}
           onChange={handleChange}
         />
@@ -544,22 +544,48 @@ const ProfileCard = () => {
       </Section>
 
       {isEditing && (
-        <div className="mt-4">
-          <label className="text-black text-l font-medium">
+        // 1. Thêm w-[400px] và gap-2 để canh thẳng hàng với các InfoRow bên trên (Họ tên, Email...)
+        <div className="mt-4 flex flex-col w-[400px] gap-2">
+
+          {/* Label tiêu đề giống hệt InfoRow */}
+          <label className="text-sm text-black dark:text-gray-200 font-medium">
             Upload ảnh đại diện
           </label>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleAvatarChange}
-            className="px-2.5 py-3.5 border-black bg-gray-100 text-black text-m font-normal w-full rounded"
-          />
-          <Button
-            onClick={handleUploadAvatar}
-            className="mt-2 w-20 p-3 bg-blue-300 rounded-2xl text-white text-l font-medium hover:bg-blue-400"
-          >
-            Upload
-          </Button>
+
+          <div className="flex flex-col gap-2">
+            {/* 2. Ẩn input file gốc để loại bỏ chữ 'No file chosen' mặc định */}
+            <input
+              id="avatar-upload"
+              type="file"
+              accept="image/*"
+              onChange={handleAvatarChange}
+              className="hidden"
+            />
+
+            {/* Tạo label đóng vai trò là nút bấm "Choose File" 
+                Style (màu nền, bo góc, chữ) được copy từ nút Upload bên dưới để đồng bộ */}
+            <div className="flex items-center gap-3">
+              <label
+                htmlFor="avatar-upload"
+                className="cursor-pointer px-4 py-2 bg-blue-500 dark:bg-blue-500 rounded-2xl text-white text-base font-medium hover:bg-blue-400 dark:hover:bg-blue-600 transition-colors"
+              >
+                Choose File
+              </label>
+
+              {/* Hiển thị tên file nếu đã chọn (thay thế cho dòng No file chosen) */}
+              <span className="text-sm text-gray-600 dark:text-gray-400 italic truncate max-w-[200px]">
+                {avatarFile ? avatarFile.name : ""}
+              </span>
+            </div>
+
+            {/* Nút thực hiện hành động Upload */}
+            <Button
+              onClick={handleUploadAvatar}
+              className="px-4 py-2 w-20 bg-blue-500 dark:bg-blue-500 rounded-2xl text-white text-base font-medium hover:bg-blue-400 dark:hover:bg-blue-600"
+            >
+              Upload
+            </Button>
+          </div>
         </div>
       )}
     </div>
