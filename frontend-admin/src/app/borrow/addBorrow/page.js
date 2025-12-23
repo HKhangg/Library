@@ -135,7 +135,7 @@ function Page() {
       }
     } catch (error) {
       console.error("Lỗi khi tạo phiếu mượn:", error);
-      toast.error("Tạo phiếu thất bạVui lòng thử lại.", { id: toastId });
+      toast.error("Tạo phiếu thất bạiVui lòng thử lại.", { id: toastId });
       setIsSubmitting(false);
     }
   };

@@ -199,10 +199,13 @@ public class BorrowCardService {
                 return repository.findByUserId(userId);
         }
 
-        public BorrowCard updateBorrowCardToBorrowing(Long id, List<String> barcodes) {
+        @Transactional
+        public BorrowCard updateBorrowCardToBorrowing(Long id, List<String> inputs) {
+
                 BorrowCard borrowCard = repository.findById(id)
                                 .orElseThrow(() -> new RuntimeException("Phiếu mượn không tồn tại"));
 
+                // 1. Cập nhật thông tin phiếu
                 borrowCard.setStatus(BorrowCard.Status.BORROWED.getStatusDescription());
                 borrowCard.setGetBookDate(LocalDateTime.now());
                 int borrowDay = settingService.getSetting().getBorrowDay();
@@ -210,59 +213,51 @@ public class BorrowCardService {
 
                 List<BorrowedBook> borrowedBooks = borrowCard.getBorrowedBooks();
 
-                for (String barcode : barcodes) {
-                        // 1. Tìm sách con theo barcode
-                        BookChild child = childBookRepo.findByBarcode(barcode)
+                // 2. Duyệt từng barcode / childBookId
+                for (String value : inputs) {
+
+                        // ✅ TÌM BOOK CHILD BẰNG BARCODE HOẶC ID
+                        BookChild child = childBookRepo.findByBarcode(value)
+                                        .or(() -> childBookRepo.findById(value))
                                         .orElseThrow(() -> new ResponseStatusException(
                                                         HttpStatus.BAD_REQUEST,
-                                                        "Không tìm thấy sách con với barcode: " + barcode));
+                                                        "Không tìm thấy sách con với barcode/ID: " + value));
 
-                        // 2. ❗ Kiểm tra sách có AVAILABLE không
+                        // 3. Kiểm tra trạng thái sách con
                         if (!child.isAvailable()) {
-                                // Phân loại message cho rõ (tùy bạn, có thể gộp chung cũng được)
-                                if (child.getStatus() == BookChild.Status.BORROWED) {
-                                        throw new ResponseStatusException(
-                                                        HttpStatus.BAD_REQUEST,
-                                                        "Sách có barcode " + barcode
-                                                                        + " đang được mượn trong một phiếu khác (không còn AVAILABLE).");
-                                } else if (child.getStatus() == BookChild.Status.NOT_AVAILABLE) {
-                                        throw new ResponseStatusException(
-                                                        HttpStatus.BAD_REQUEST,
-                                                        "Sách có barcode " + barcode
-                                                                        + " đã bị đánh dấu không còn sử dụng (NOT_AVAILABLE).");
-                                } else {
-                                        throw new ResponseStatusException(
-                                                        HttpStatus.BAD_REQUEST,
-                                                        "Sách có barcode " + barcode + " hiện không còn AVAILABLE.");
-                                }
+                                throw new ResponseStatusException(
+                                                HttpStatus.BAD_REQUEST,
+                                                "Sách có barcode/ID " + value + " hiện không còn AVAILABLE");
                         }
 
                         String childId = child.getId();
                         Long parentId = child.getBook().getMaSach();
 
+                        // 4. Match BorrowedBook trong phiếu
                         BorrowedBook matched = borrowedBooks.stream()
-                                        .filter(bb -> bb.getBookId().equals(parentId)
-                                                        && (bb.getChildBookId() == null
-                                                                        || bb.getChildBookId().isEmpty()))
+                                        .filter(bb -> bb.getBookId().equals(parentId) &&
+                                                        (bb.getChildBookId() == null || bb.getChildBookId().isEmpty()))
                                         .findFirst()
                                         .orElseThrow(() -> new ResponseStatusException(
                                                         HttpStatus.BAD_REQUEST,
-                                                        "Sách có barcode " + barcode + " không thuộc phiếu mượn #"
+                                                        "Sách " + value + " không thuộc phiếu mượn #"
                                                                         + borrowCard.getId()));
 
+                        // 5. Gán sách con
                         matched.setChildBookId(childId);
                         matched.setStatus(BorrowedBook.Status.BORROWING);
 
+                        // 6. Update trạng thái sách con
                         child.setStatus(BookChild.Status.BORROWED);
                         childBookRepo.save(child);
                 }
 
+                // 7. Gửi mail + notification
                 EmailService.mailTaken(borrowCard);
-                String message = "Bạn đã mượn sách thành công. ID Phiếu mượn: " + borrowCard.getId();
-                notificationService.sendNotification(borrowCard.getUserId(), message);
+                notificationService.sendNotification(
+                                borrowCard.getUserId(),
+                                "Bạn đã mượn sách thành công. ID Phiếu mượn: " + borrowCard.getId());
 
-                // ✅ KHÔNG cần setBorrowedBooks vì borrowedBooks đã là managed entity
-                // borrowCard.setBorrowedBooks(borrowedBooks);
                 return repository.save(borrowCard);
         }
 

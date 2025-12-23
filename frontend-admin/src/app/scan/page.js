@@ -355,7 +355,7 @@ const UploadImage = () => {
         );
         setInfo(updatedBooks);
         // Push barcode thay vì id vì backend cần barcode
-        children.push(resultChild.barcode);
+        children.push(resultChild.barcode|| resultChild.id);
         setResultChild(null); // Reset sau khi xử lý thành công
       } else {
         // Trả sách - so sánh với childBookId (là String)

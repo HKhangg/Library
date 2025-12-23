@@ -53,7 +53,7 @@ public class EmailService {
     String ngayLay = borrowCard.getGetBookDate().format(formatter).toString();
     String ngayTra = borrowCard.getDueDate().format(formatter).toString();
     Long idPhieu = borrowCard.getId();
-    String subject = "Bạn đã trả sách thành công!";
+    String subject = "Bạn đã mượn sách thành công!";
     String body = String.format(
         """
                 <h3><b>Xin chào %s,</b></h3>
