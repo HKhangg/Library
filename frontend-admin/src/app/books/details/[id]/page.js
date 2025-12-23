@@ -277,6 +277,8 @@ const Page = () => {
       </div>
     );
 
+
+  
   return (
     <div className="flex flex-row w-full min-h-screen bg-[#EFF3FB]">
       <Sidebar />
