@@ -1,12 +1,18 @@
 "use client";
 
+// Conflict marker removed: keep user code
+import React, { useEffect, useState, useRef } from "react";
+// Conflict marker removed
 import React, { useState, useMemo } from "react";
+// Conflict marker removed
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { useParams } from "next/navigation";
-import { CalendarClock, Check, Search, X } from "lucide-react";
+import { CalendarClock, Check, Search, X, Download, Printer } from "lucide-react";
 import { ThreeDot } from "react-loading-indicators";
 import toast, { Toaster } from "react-hot-toast";
+import Barcode from "react-barcode";
+
 import Sidebar from "@/app/components/sidebar/Sidebar";
 import axios from "axios";
 
@@ -49,6 +55,15 @@ const Page = () => {
       // Refresh lại danh sách sách con
       mutateChildren();
 
+      setChildBookList((prev) => [
+        ...prev,
+        {
+          id: newChildBook.id,
+          barcode: newChildBook.barcode,
+          status: "AVAILABLE",
+        },
+      ]);
+
       toast.success("Đã tạo sách con mới thành công", { id: toastId });
     } catch (error) {
       console.error(error);
@@ -77,19 +92,14 @@ const Page = () => {
   // Logic Lọc & Thống kê 
   const { filteredBooks, borrowedCount, availableCount } = useMemo(() => {
     const safeList = Array.isArray(childBookList) ? childBookList : [];
-
-    // Lọc theo search query
     let filtered = safeList;
     if (searchQuery.trim()) {
-      filtered = safeList.filter((cb) =>
-        cb.id.toString().includes(searchQuery.trim())
+      filtered = safeList.filter(
+        (cb) => cb.id.toString() === searchQuery.trim() || cb.barcode === searchQuery.trim()
       );
     }
-
-    // Thống kê
     const borrowed = safeList.filter((cb) => cb.status === "BORROWED").length;
     const available = book ? book.tongSoLuong - borrowed : 0;
-
     return {
       filteredBooks: filtered,
       borrowedCount: borrowed,
@@ -122,31 +132,9 @@ const Page = () => {
     </div>
   );
 
+  // Đã có ChildBookCard phía dưới, xóa khai báo trùng lặp ở đây
   // Component UI: ChildBookCard
-  const ChildBookCard = ({ childBook }) => (
-    <div className="flex bg-white rounded-lg shadow p-4 items-center justify-between">
-      <div className="flex items-center gap-2 font-medium">
-        <span>ID con: {childBook.id}</span>
-        {childBook.status === "AVAILABLE" && (
-          <Check className="w-5 h-5 text-green-500" />
-        )}
-        {childBook.status === "BORROWED" && (
-          <CalendarClock className="w-5 h-5 text-yellow-500" />
-        )}
-        {childBook.status === "NOT_AVAILABLE" && (
-          <X className="w-5 h-5 text-red-500" />
-        )}
-      </div>
-      <Button
-        onClick={() => handleDeleteChild(childBook.id)}
-        size="sm"
-        variant="destructive"
-        className="bg-red-500 hover:bg-red-600 text-white"
-      >
-        Xóa
-      </Button>
-    </div>
-  );
+  // ...existing code...
 
   if (loading) {
     return (
@@ -164,25 +152,16 @@ const Page = () => {
       <Toaster position="top-center" reverseOrder={false} />
       <Sidebar />
       <div className="flex-1 p-6 md:ml-52">
-        {/* Controls */}
-        <div className="flex mb-6 justify-between gap-4">
-          <div className="flex flex-1 gap-2">
-            <Input
-              placeholder="Tìm kiếm sách con theo ID"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-10 px-4 rounded-lg bg-white shadow-sm flex-1 max-w-md"
-            />
-            <Button
-              className="w-12 h-10 bg-[#062D76] hover:bg-gray-700"
-              onClick={() => { }} // Search is handled by state reactive
-            >
-              <Search className="w-6 h-6 text-white" />
-            </Button>
-          </div>
+        <div className="flex mb-6">
+          <Input
+            placeholder="Tìm kiếm sách con theo ID hoặc Barcode"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="flex-1 h-10 px-4 rounded-lg"
+          />
           <Button
             onClick={handleAddChild}
-            className="bg-green-600 hover:bg-green-700 text-white"
+            className="bg-green-600 hover:bg-green-700 text-white ml-2"
           >
             + Thêm sách con
           </Button>

@@ -37,15 +37,16 @@ public class BookServiceImpl implements BookService {
     private final CategoryChildRepository childRepo;
     //@Autowired
     //private EmbeddingModel embeddingModel;
-   // @Autowired
-    //private BookEnrichmentService bookEnrichmentService;
 
-/*     private String buildBookTextForEmbedding(Book b) {
-    StringBuilder sb = new StringBuilder();
-    if (b.getTenSach() != null) sb.append(b.getTenSach()).append(". ");
-    if (b.getTenTacGia() != null) sb.append("Tác giả: ").append(b.getTenTacGia()).append(". ");
-    return sb.toString();
-} */
+    /*
+     * private String buildBookTextForEmbedding(Book b) {
+     * StringBuilder sb = new StringBuilder();
+     * if (b.getTenSach() != null) sb.append(b.getTenSach()).append(". ");
+     * if (b.getTenTacGia() != null)
+     * sb.append("Tác giả: ").append(b.getTenTacGia()).append(". ");
+     * return sb.toString();
+     * }
+     */
 
     // private final Long defaultParentId = 1L;
     // public BookServiceImpl(BookRepository repo) { this.repo = repo; }
@@ -53,8 +54,7 @@ public class BookServiceImpl implements BookService {
             BookRepository repo,
             CategoryRepository categoryRepo,
             CategoryChildRepository childRepo,
-            BookChildRepository bookChildRepository
-            , BorrowCardRepository borrowCardRepository) {
+            BookChildRepository bookChildRepository, BorrowCardRepository borrowCardRepository) {
         this.repo = repo;
         // this.categoryRepo = categoryRepo;
         this.childRepo = childRepo;
@@ -146,8 +146,7 @@ public class BookServiceImpl implements BookService {
         CategoryChild child = childRepo.findById(childId)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.BAD_REQUEST, "Không tìm thấy thể loại con với id: " + childId));
-        
-    
+
         book.setCategoryChild(child);
         book.setTrangThai(Book.TrangThai.CON_SAN);
         Book saved = repo.save(book);
@@ -178,7 +177,7 @@ public class BookServiceImpl implements BookService {
     public Book updateBook(Long maSach, Map<String, Object> updates) {
         try {
             Book book = getBookbyID(maSach);
-         //   boolean needsEmbeddingUpdate = false;
+            // boolean needsEmbeddingUpdate = false;
             if (updates == null || updates.isEmpty()) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                         "Không có dữ liệu cập nhật nào được cung cấp.");
@@ -226,8 +225,7 @@ public class BookServiceImpl implements BookService {
                                     "Số lượng bản sách mới phải lớn hơn hoặc bằng 0.");
                         }
 
-                        List<BookChild.Status> activeStatuses = List.of(BookChild.Status.AVAILABLE, BookChild.Status.BORROWED);
-                        long activeCount = bookChildRepository.countActiveByBookMaSach(maSach, activeStatuses);
+                        long activeCount = bookChildRepository.countActiveByBookMaSach(maSach);
                         long totalCount = bookChildRepository.countByBookMaSach(maSach);
                         for (int i = 0; i < newQty; i++) {
                             String suffix = generateSuffix((int) totalCount + i);
@@ -464,93 +462,95 @@ public class BookServiceImpl implements BookService {
         return repo.findBooksNeedingRestock(quantity);
     }
 
-
     // @Override
     // public List<Book> searchBooks2(String query) {
-    //     // Kiểm tra nếu query không phải là null hoặc rỗng
-    //     if (query == null || query.trim().isEmpty()) {
-    //         return List.of(); // Trả về danh sách rỗng nếu không có input
-    //     }
-
-    //     // Tìm kiếm theo tên sách, tên tác giả hoặc thể loại (kiểm tra đầy đủ các trường
-    //     // hợp)
-    //     List<Book> books = repo.findByTenSachContainingIgnoreCase(query);
-    //     if (books.isEmpty()) {
-    //         books = repo.findByTenTacGiaContainingIgnoreCase(query);
-    //     }
-    //     // if (books.isEmpty()) {
-    //     // books = repo.findByTheLoaiContainingIgnoreCase(query);
-    //     // }
-
-    //     return books;
+    // // Kiểm tra nếu query không phải là null hoặc rỗng
+    // if (query == null || query.trim().isEmpty()) {
+    // return List.of(); // Trả về danh sách rỗng nếu không có input
     // }
-//     @Override
-// public List<Book> searchBooks2(String query) {
-//     if (query == null || query.trim().isEmpty()) {
-//         return List.of();
-//     }
-//     String trimmed = query.trim().toLowerCase();
-//     List<Book> all = repo.findAll();
 
-//     return all.stream()
-//         .filter(book -> {
-//             if (book.getTenSach() != null && book.getTenSach().toLowerCase().contains(trimmed)) {
-//                 return true;
-//             }
-//             if (book.getTenTacGia() != null && book.getTenTacGia().toLowerCase().contains(trimmed)) {
-//                 return true;
-//             }
-//             if (book.getMoTa() != null && book.getMoTa().toLowerCase().contains(trimmed)) {
-//                 return true;
-//             }
-//             if (book.getNxb() != null && book.getNxb().toLowerCase().contains(trimmed)) {
-//                 return true;
-//             }
-//             if (book.getCategoryChild() != null &&
-//                 book.getCategoryChild().getName() != null &&
-//                 book.getCategoryChild().getName().toLowerCase().contains(trimmed)) {
-//                 return true;
-//             }
-//             try {
-//                 int year = Integer.parseInt(trimmed);
-//                 if (book.getNam() != null && book.getNam().equals(year)) {
-//                     return true;
-//                 }
-//             } catch (NumberFormatException e) {
-//                 // bỏ qua
-//             }
-//             return false;
-//         })
-//         .collect(Collectors.toList());
-// }
+    // // Tìm kiếm theo tên sách, tên tác giả hoặc thể loại (kiểm tra đầy đủ các
+    // trường
+    // // hợp)
+    // List<Book> books = repo.findByTenSachContainingIgnoreCase(query);
+    // if (books.isEmpty()) {
+    // books = repo.findByTenTacGiaContainingIgnoreCase(query);
+    // }
+    // // if (books.isEmpty()) {
+    // // books = repo.findByTheLoaiContainingIgnoreCase(query);
+    // // }
 
-@Override
-public List<Book> searchBooks2(String query) {
-    if (query == null || query.trim().isEmpty()) {
-        return List.of();
+    // return books;
+    // }
+    // @Override
+    // public List<Book> searchBooks2(String query) {
+    // if (query == null || query.trim().isEmpty()) {
+    // return List.of();
+    // }
+    // String trimmed = query.trim().toLowerCase();
+    // List<Book> all = repo.findAll();
+
+    // return all.stream()
+    // .filter(book -> {
+    // if (book.getTenSach() != null &&
+    // book.getTenSach().toLowerCase().contains(trimmed)) {
+    // return true;
+    // }
+    // if (book.getTenTacGia() != null &&
+    // book.getTenTacGia().toLowerCase().contains(trimmed)) {
+    // return true;
+    // }
+    // if (book.getMoTa() != null && book.getMoTa().toLowerCase().contains(trimmed))
+    // {
+    // return true;
+    // }
+    // if (book.getNxb() != null && book.getNxb().toLowerCase().contains(trimmed)) {
+    // return true;
+    // }
+    // if (book.getCategoryChild() != null &&
+    // book.getCategoryChild().getName() != null &&
+    // book.getCategoryChild().getName().toLowerCase().contains(trimmed)) {
+    // return true;
+    // }
+    // try {
+    // int year = Integer.parseInt(trimmed);
+    // if (book.getNam() != null && book.getNam().equals(year)) {
+    // return true;
+    // }
+    // } catch (NumberFormatException e) {
+    // // bỏ qua
+    // }
+    // return false;
+    // })
+    // .collect(Collectors.toList());
+    // }
+
+    @Override
+    public List<Book> searchBooks2(String query) {
+        if (query == null || query.trim().isEmpty()) {
+            return List.of();
+        }
+        String trimmed = query.trim().toLowerCase();
+        List<Book> all = repo.findAll();
+
+        return all.stream()
+                .filter(book -> {
+                    // Chuyển tất cả các trường thành chuỗi và kiểm tra contain
+                    String bookData = ((book.getTenSach() != null ? book.getTenSach().toLowerCase() : "") +
+                            (book.getTenTacGia() != null ? book.getTenTacGia().toLowerCase() : "") +
+                            (book.getMoTa() != null ? book.getMoTa().toLowerCase() : "") +
+                            (book.getNxb() != null ? book.getNxb().toLowerCase() : "") +
+                            (book.getCategoryChild() != null && book.getCategoryChild().getName() != null
+                                    ? book.getCategoryChild().getName().toLowerCase()
+                                    : "")
+                            +
+                            (book.getNam() != null ? book.getNam().toString() : "") +
+                            (book.getTrongLuong() != null ? book.getTrongLuong().toString() : ""));
+
+                    return bookData.contains(trimmed);
+                })
+                .collect(Collectors.toList());
     }
-    String trimmed = query.trim().toLowerCase();
-    List<Book> all = repo.findAll();
-
-    return all.stream()
-        .filter(book -> {
-            // Chuyển tất cả các trường thành chuỗi và kiểm tra contain
-            String bookData = (
-                (book.getTenSach() != null ? book.getTenSach().toLowerCase() : "") +
-                (book.getTenTacGia() != null ? book.getTenTacGia().toLowerCase() : "") +
-                (book.getMoTa() != null ? book.getMoTa().toLowerCase() : "") +
-                (book.getNxb() != null ? book.getNxb().toLowerCase() : "") +
-                (book.getCategoryChild() != null && book.getCategoryChild().getName() != null 
-                    ? book.getCategoryChild().getName().toLowerCase() : "") +
-                (book.getNam() != null ? book.getNam().toString() : "") +
-                (book.getTrongLuong() != null ? book.getTrongLuong().toString() : "")
-            );
-
-            return bookData.contains(trimmed);
-        })
-        .collect(Collectors.toList());
-}
-
 
     @Override
     // Gợi ý theo phiếu mượn (nếu có userId)
@@ -625,56 +625,56 @@ public List<Book> searchBooks2(String query) {
     }
 
     @Override
-public List<Book> getAllBooksV2(String filter) {
-    List<Book> list = getAllBooks();
-    List<Book> filtered = list.stream()
-            .filter(b -> b.getTrangThai() != Book.TrangThai.DA_XOA)
-            .collect(Collectors.toList());
-    filtered.forEach(Book::updateTrangThai);
-    switch (filter) {
-        case "NEWEST":
-            filtered = filtered.stream()
-                    .sorted(Comparator.comparing(Book::getCreatedAt).reversed())
-                    .collect(Collectors.toList());
-            break;
-        case "MOST_BORROWED":
-            filtered = filtered.stream()
-                    .sorted(Comparator.comparing(Book::getSoLuongMuon).reversed())
-                    .collect(Collectors.toList());
-            break;
-        default:
-            break;
+    public List<Book> getAllBooksV2(String filter) {
+        List<Book> list = getAllBooks();
+        List<Book> filtered = list.stream()
+                .filter(b -> b.getTrangThai() != Book.TrangThai.DA_XOA)
+                .collect(Collectors.toList());
+        filtered.forEach(Book::updateTrangThai);
+        switch (filter) {
+            case "NEWEST":
+                filtered = filtered.stream()
+                        .sorted(Comparator.comparing(Book::getCreatedAt).reversed())
+                        .collect(Collectors.toList());
+                break;
+            case "MOST_BORROWED":
+                filtered = filtered.stream()
+                        .sorted(Comparator.comparing(Book::getSoLuongMuon).reversed())
+                        .collect(Collectors.toList());
+                break;
+            default:
+                break;
+        }
+        return filtered;
     }
-    return filtered;
-}
 
-@Override
-public List<Book> getBooksByCategoryChildV2(String categoryChildId, String filter) {
-    List<Book> list = getBooksByCategoryChild(categoryChildId);
-    List<Book> filtered = list.stream()
-            .filter(b -> b.getTrangThai() != Book.TrangThai.DA_XOA)
-            .collect(Collectors.toList());
-    filtered.forEach(Book::updateTrangThai);
-    switch (filter) {
-        case "NEWEST":
-            filtered = filtered.stream()
-                    .sorted(Comparator.comparing(Book::getCreatedAt).reversed())
-                    .collect(Collectors.toList());
-            break;
-        case "MOST_BORROWED":
-            filtered = filtered.stream()
-                    .sorted(Comparator.comparing(Book::getSoLuongMuon).reversed())
-                    .collect(Collectors.toList());
-            break;
-        default:
-            break;
+    @Override
+    public List<Book> getBooksByCategoryChildV2(String categoryChildId, String filter) {
+        List<Book> list = getBooksByCategoryChild(categoryChildId);
+        List<Book> filtered = list.stream()
+                .filter(b -> b.getTrangThai() != Book.TrangThai.DA_XOA)
+                .collect(Collectors.toList());
+        filtered.forEach(Book::updateTrangThai);
+        switch (filter) {
+            case "NEWEST":
+                filtered = filtered.stream()
+                        .sorted(Comparator.comparing(Book::getCreatedAt).reversed())
+                        .collect(Collectors.toList());
+                break;
+            case "MOST_BORROWED":
+                filtered = filtered.stream()
+                        .sorted(Comparator.comparing(Book::getSoLuongMuon).reversed())
+                        .collect(Collectors.toList());
+                break;
+            default:
+                break;
+        }
+        return filtered;
     }
-    return filtered;
-}
 
-@Override
-public List<Book> getBooksByCategoryParentV2(Long categoryParentId, String filter) {
-    List<String> childIds = childRepo.findByParentId(categoryParentId)
+    @Override
+    public List<Book> getBooksByCategoryParentV2(Long categoryParentId, String filter) {
+        List<String> childIds = childRepo.findByParentId(categoryParentId)
                 .stream()
                 .map(child -> child.getId())
                 .collect(Collectors.toList());
@@ -700,6 +700,6 @@ public List<Book> getBooksByCategoryParentV2(Long categoryParentId, String filte
                 break;
         }
         return combined;
-}
+    }
 
 }

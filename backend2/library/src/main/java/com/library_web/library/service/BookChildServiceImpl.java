@@ -37,14 +37,37 @@ public class BookChildServiceImpl implements BookChildService {
     @Transactional
     public BookChild addChild(Long bookId) {
         Book book = bookRepo.findById(bookId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy sách: " + bookId));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Không tìm thấy sách: " + bookId));
+
+        // 1. Tạo suffix nội bộ (id con), theo kiểu "a", "b", "c"
         List<BookChild> existing = childRepo.findByBookMaSachOrderByIdAsc(bookId);
         char suffix = (char) ('a' + existing.size());
+
         BookChild child = new BookChild(book, String.valueOf(suffix));
-        book.addChild(child);
+
+        // 2. Lấy barcode lớn nhất hiện tại trong DB
+        String lastBarcode = childRepo.findMaxBarcode();
+        String nextBarcode;
+
+        if (lastBarcode == null || lastBarcode.isEmpty()) {
+            nextBarcode = "LIB00000001";
+        } else {
+            String number = lastBarcode.substring(3); // bỏ "LIB"
+            int n = Integer.parseInt(number) + 1;
+            nextBarcode = String.format("LIB%08d", n);
+        }
+        // 3. Gán barcode mới cho sách con
+        child.setBarcode(nextBarcode);
+
+        // 4. Lưu bookChild vào DB
+        childRepo.save(child);
+
+        // 5. Cập nhật số lượng sách cha
         book.setTongSoLuong(book.getTongSoLuong() + 1);
         book.updateTrangThai();
         bookRepo.save(book);
+
         return child;
     }
 

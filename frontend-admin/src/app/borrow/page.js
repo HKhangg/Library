@@ -21,96 +21,70 @@ import useSWR, { mutate } from "swr";
 import { fetcher } from "@/lib/fetcher";
 
 const Page = () => {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-
-  // Lấy trạng thái từ URL thay vì useState. Default = đã yêu cầu
-  const currentTab = searchParams.get("tab") || "Đã yêu cầu";
-  const urlSearchQuery = searchParams.get("query") || "";
-  const currentPage = Number(searchParams.get("page")) || 1;
+  const [allBorrowCards, setAllBorrowCards] = useState([]);
+  const [selectedButton, setSelectedButton] = useState("Đã yêu cầu");
+  const [loading, setLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const itemsPerPage = 10;
 
-  // State nội bộ cho ô input search 
-  const [localSearch, setLocalSearch] = useState(urlSearchQuery);
-
-  // Đồng bộ URL vào ô input khi URL thay đổi
-  useEffect(() => {
-    setLocalSearch(urlSearchQuery);
-  }, [urlSearchQuery]);
-
-  // Fetch Data
-  const {
-    data: allBorrowCards = [],
-    isLoading,
-    mutate: mutateBorrowCards
-  } = useSWR(
-    `${process.env.NEXT_PUBLIC_API_URL}/api/borrow-cards`,
-    fetcher,
-    {
-      revalidateOnFocus: true,
-      refreshInterval: 30000,
-    }
-  );
-
-  // Hàm cập nhật URL
-  const updateParams = (updates) => {
-    const params = new URLSearchParams(searchParams);
-
-    Object.entries(updates).forEach(([key, value]) => {
-      if (value) {
-        params.set(key, value);
-      } else {
-        params.delete(key);
-      }
-    });
-
-    // Khi đổi Tab hoặc Search -> Reset về trang 1
-    if (updates.tab || updates.query !== undefined) {
-      params.set("page", 1);
+  const fetchBorrowCards = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/borrow-cards`,
+        {
+          method: "GET",
+        }
+      );
+      const data = await response.json();
+      console.log(data);
+      setAllBorrowCards(data);
+      setTotalPages(Math.ceil(data.length / itemsPerPage) || 1);
+      setCurrentPage(1); // Reset to first page
+    } catch (error) {
+      console.error("Lỗi khi fetch phiếu mượn:", error);
+      toast.error("Không thể tải dữ liệu phiếu mượn.");
+    } finally {
+      setLoading(false);
     }
 
     router.replace(`${pathname}?${params.toString()}`);
   };
 
-  // Logic Lọc dữ liệu
-  const filteredCards = useMemo(() => {
-    let result = allBorrowCards;
+  const filteredCards = allBorrowCards?.filter((card) => {
+    if (selectedButton === "Đã yêu cầu") return card.status === "Đã yêu cầu";
+    if (selectedButton === "Đang mượn") return card.status === "Đang mượn";
+    if (selectedButton === "Đã trả") return card.status === "Đã trả";
+    return false;
+  });
 
-    // Lọc theo Tab
-    if (currentTab === "Đã yêu cầu") {
-      result = result.filter((c) => c.status === "Đã yêu cầu" || c.status === "REQUESTED");
-    } else if (currentTab === "Đang mượn") {
-      result = result.filter((c) => c.status === "Đang mượn" || c.status === "BORROWED");
-    } else if (currentTab === "Đã trả") {
-      result = result.filter((c) => c.status === "Đã trả" || c.status === "RETURNED");
-    }
-
-    // Lọc theo Search Query
-    if (urlSearchQuery.trim()) {
-      const lowerQuery = urlSearchQuery.toLowerCase();
-      result = result.filter(
-        (card) =>
-          card.id.toString().includes(lowerQuery) ||
-          card.userId.toString().includes(lowerQuery)
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchFilter, setSearchFilter] = useState([]);
+  const handleSearch = () => {
+    if (searchQuery) {
+      setLoading(true);
+      const filter = filteredCards?.filter((card) =>
+        card?.id.toString() === searchQuery || // tìm theo id
+        card?.userId.toString() === searchQuery
+          ? card
+          : null
       );
+      setSearchFilter(filter);
+      setTotalPages(Math.ceil(filter.length / itemsPerPage) || 1);
+      setCurrentPage(1); // Reset to first page
+      setLoading(false);
+      if (filter.length < 1) toast.error("Không tìm thấy kết quả");
+    } else {
+      setSearchFilter([]);
+      setTotalPages(Math.ceil(filteredCards.length / itemsPerPage) || 1);
+      setCurrentPage(1); // Reset to first page
     }
+  };
 
-    return result;
-  }, [allBorrowCards, currentTab, urlSearchQuery]);
-
-  // Phân trang
-  const totalPages = Math.ceil(filteredCards.length / itemsPerPage) || 1;
-  const paginatedCards = filteredCards.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
-
-  // Handlers
-  const handlePageChange = (page) => {
-    if (page >= 1 && page <= totalPages) {
-      updateParams({ page: page });
-    }
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString("vi-VN"); // Kết quả: 22/04/2025
   };
 
   const handleTabChange = (tabName) => {

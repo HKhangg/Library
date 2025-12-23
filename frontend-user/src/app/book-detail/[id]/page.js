@@ -113,55 +113,30 @@ const BookDetailsPage = () => {
       router.push("/user-login");
       return;
     }
-
-    // 2. Kiểm tra sách có sẵn
-    let key = details.trangThai;
-    if (!key) {
-      const anyAvailable = details.children?.some((c) => c.available);
-      key = anyAvailable ? "CON_SAN" : "DA_HET";
-    }
-    const { available } = statusMap[key] || statusMap.CON_SAN;
-
-    if (!available) {
-      toast.error("Sách này hiện đã hết, không thể mượn.");
-      return;
-    }
-
-    const toastId = toast.loading("Đang tạo phiếu mượn...");
-
     try {
       const response = await axios.post(
         `${process.env.NEXT_PUBLIC_API_URL}/api/borrow-cards`,
         {
           userId: user.id,
-          borrowedBooks: [{ bookId: id, childBookId: null }],
-          borrowDate: new Date().toISOString(),
-          status: "REQUESTED",
-          dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+          bookIds: [parseInt(id)]  // Gửi đúng format như backend expect
         }
       );
 
-      // 4. Xử lý thành công
       if (response.status === 200) {
-        toast.success("Phiếu mượn đã được tạo", { id: toastId });
+        alert("Phiếu mượn đã được tạo thành công!");
         window.location.href = "/borrowed-card";
       } else {
-        toast.error("Có lỗi xảy ra khi tạo phiếu mượn", { id: toastId });
+        alert("Có lỗi xảy ra khi tạo phiếu mượn");
       }
-
     } catch (error) {
-      console.error("Lỗi khi tạo phiếu mượn:", error.response);
-
-      let errorMessage = "Không thể mượn sách. Vui lòng thử lại."; 
-
+      console.error("Lỗi gọi API mượn sách:", error);
+      let errorMessage = "Không thể mượn sách. Vui lòng thử lại.";
       if (error.response) {
         const status = error.response.status;
         const errorData = error.response.data;
-
         if (status === 400) {
           errorMessage = "Bạn đã đạt đến giới hạn mượn sách hoặc đã mượn sách này rồi.";
         }
-
         if (errorData) {
           if (typeof errorData === 'string' && errorData.length > 0) {
             errorMessage = errorData;
@@ -177,8 +152,7 @@ const BookDetailsPage = () => {
       } else {
         errorMessage = error.message;
       }
-
-      toast.error(errorMessage, { id: toastId });
+      toast.error(errorMessage);
     }
   };
 

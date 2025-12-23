@@ -90,22 +90,10 @@ const Page = () => {
     const toastId = toast.loading("Đang tạo phiếu mượn...");
     try {
       const booksInCart = selected;
-
-      const payload = {
-        userId: parseInt(user.id, 10),
-        borrowedBooks: booksInCart.map((bookId) => ({
-          bookId: parseInt(bookId, 10),
-          childBookId: null,
-        })),
-        borrowDate: new Date().toISOString(),
-        status: "REQUESTED",
-        dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-      };
-
-      const response = await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/borrow-cards`,
-        payload
-      );
+      const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/borrow-cards`, {
+        userId: user.id,
+        bookIds: booksInCart, // ✅ Sửa: gửi bookIds thay vì borrowedBooks
+      });
 
       if (response.status === 200) {
         toast.success("Phiếu mượn đã được tạo!", { id: toastId });

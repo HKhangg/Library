@@ -17,6 +17,7 @@ const BookCard = ({
   author,
   publisher,
   location,
+  bookId,
 }) => {
   return (
     <article className="flex grow shrink gap-3 min-w-60 cursor-pointer bg-white rounded-xl shadow-[0px_2px_2px_rgba(0,0,0,0.25)] p-5">
@@ -30,10 +31,24 @@ const BookCard = ({
         <h3 className="flex-1 shrink gap-2.5 self-stretch mt-2 w-full text-[1.125rem] font-medium text-black basis-0">
           {title}
         </h3>
-        <p className="text-base text-black mt-1">Tác giả: {author}</p>
-        <p className="text-base text-black mt-1">Thể loại: {category}</p>
-        <p className="text-base text-black mt-1">NXB: {publisher}</p>
-        <p className="text-base text-black mt-1">Vị trí tủ: {location}</p>
+        {bookId && (
+          <p className="flex-1 shrink gap-2.5 self-stretch mt-2 w-full text-base text-black basis-0">
+            ID sách: {bookId}
+          </p>
+        )}
+        <p className="flex-1 shrink gap-2.5 self-stretch mt-2 w-full text-base text-black basis-0">
+          Tác giả: {author}
+        </p>
+        <p className="flex-1 shrink gap-2.5 self-stretch mt-2 w-full text-base text-black basis-0">
+          Thể loại: {category}
+        </p>
+        <p className="flex-1 shrink gap-2.5 self-stretch mt-2 w-full text-base text-black basis-0">
+          NXB: {publisher}
+        </p>
+        <p className="flex-1 shrink gap-2.5 self-stretch mt-2 w-full text-base text-black basis-0">
+          Vị trí tủ: {location}
+        </p>
+
       </div>
     </article>
   );
@@ -96,7 +111,29 @@ const BorrowingInfo = ({ info }) => {
 const ChiTietPhieuMuon = () => {
   const { id } = useParams();
   const router = useRouter();
-  const [popUpOpen, setPopUpOpen] = useState(false);
+  useEffect(() => {
+    const fetchBorrowCardDetail = async () => {
+      try {
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/borrow-cards/${id}`,
+          {
+            method: "GET",
+          }
+        );
+        const res = await response.json();
+        console.log("API Response:", res);
+        console.log("BookIds array:", res.bookIds);
+        setBorrowDetail(res);
+      } catch (error) {
+        console.error("Lỗi khi fetch chi tiết phiếu mượn:", error);
+        toast.error("Không thể tải dữ liệu phiếu mượn");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchBorrowCardDetail();
+  }, [id]);
+
 
   // useSWR: Lấy thông tin chi tiết phiếu mượn
   const { data: borrowDetail, isLoading, error } = useSWR(
@@ -191,23 +228,19 @@ const ChiTietPhieuMuon = () => {
               <h2 className="text-lg font-medium text-[#062D76] text-center mt-8 mb-4">
                 Danh sách sách mượn
               </h2>
-
-              <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 items-start w-full">
-                {borrowDetail?.bookIds?.length > 0 ? (
-                  borrowDetail.bookIds.map((book, index) => (
-                    <BookCard
-                      key={index}
-                      imageSrc={book.image}
-                      title={book.name}
-                      author={book.author}
-                      category={book.category}
-                      publisher={book.publisher}
-                      location={book.viTri}
-                    />
-                  ))
-                ) : (
-                  <p className="col-span-full text-center text-gray-500">Không có thông tin sách.</p>
-                )}
+              <section className="grid grid-cols-1 max-sm:grid-cols-1 gap-5 items-start mt-2 w-full max-md:max-w-full">
+                {borrowDetail?.bookIds?.map((book, index) => (
+                  <BookCard
+                    key={index}
+                    imageSrc={book.image}
+                    title={book.name}
+                    author={book.author}
+                    category={book.category}
+                    publisher={book.publisher}
+                    location={book.viTri}
+                    bookId={book.maSach}
+                  />
+                ))}
               </section>
             </div>
           ) : (

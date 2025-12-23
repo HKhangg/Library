@@ -1,13 +1,14 @@
 "use client";
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { Button } from "../components/ui/button";
 import { ThreeDot } from "react-loading-indicators";
 import toast, { Toaster } from "react-hot-toast";
 import { format } from "date-fns";
-import { Book, CalendarClock, Undo2 } from "lucide-react";
+import { Book, CalendarClock, Undo2, Camera, QrCode, Scan } from "lucide-react";
 import UploadChild from "./childBook/page";
 import Link from "next/link";
-import useSWR from "swr";
+import CameraScanner from "./CameraScanner";
+
 
 // Fetcher
 const fetcher = async (url) => {
@@ -25,6 +26,22 @@ const fetcher = async (url) => {
 const useUserScan = () => {
   const [userResult, setUserResult] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [text, setText] = useState("");
+  const [borrowCard, setBorrowCard] = useState(null);
+  const [result, setResult] = useState(null);
+  const [currentChoose, setCurrent] = useState(null);
+  const [currentInfo, setInfo] = useState(null);
+  const [resultChild, setResultChild] = useState(null);
+  const [done, setDone] = useState(false);
+  const [children, setChildren] = useState([]);
+  const [showQRScanner, setShowQRScanner] = useState(false);
+  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
+  const lastFetchedUserId = useRef(null);
+  const isFetchingRef = useRef(false);
+  // Hàm xử lý khi người dùng chọn ảnh
+  const onFileChange = (event) => {
+    setSelectedFile(event.target.files[0]);
+  };
 
   const searchUser = async (text) => {
     if (!text) {
@@ -33,12 +50,457 @@ const useUserScan = () => {
     }
     setLoading(true);
     try {
-      const data = await fetcher(`${process.env.NEXT_PUBLIC_API_URL}/api/user/${text}`);
-      setUserResult(data);
-      toast.success("Tìm thấy người dùng!");
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/user/${text}`,
+        {
+          method: "GET",
+        }
+      );
+      if (!response.ok) {
+        window.alert("Không tìm thấy người dùng");
+        setLoading(false);
+        return;
+      }
+      const userData = await response.json();
+      console.log(userData);
+      setResult(userData);
+      setText("");
+      
+      // Gọi fetchBorrowCardsForUser trực tiếp
+      await fetchBorrowCardsForUser(userData.id);
     } catch (e) {
-      toast.error(e.message || "Không tìm thấy người dùng"); // Hiển thị message từ API nếu có
-      setUserResult(null);
+      console.log(e);
+      setLoading(false);
+    }
+  };
+
+  // Xử lý khi quét QR code thành công
+  const handleQRScanSuccess = async (decodedText, scanType) => {
+    console.log("QR Code scanned:", decodedText);
+    if (scanType === "qrcode") {
+      // Quét mã QR người dùng
+      setShowQRScanner(false);
+      setText(decodedText);
+      // Tự động tìm kiếm user
+      setLoading(true);
+      try {
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/user/${decodedText}`,
+          {
+            method: "GET",
+          }
+        );
+        if (!response.ok) {
+          window.alert("Không tìm thấy người dùng với ID: " + decodedText);
+          setLoading(false);
+          return;
+        }
+        const userData = await response.json();
+        setResult(userData);
+        toast.success("Quét mã QR thành công!");
+        
+        // Gọi getBorrowCard trực tiếp sau khi có user data
+        await fetchBorrowCardsForUser(userData.id);
+      } catch (e) {
+        console.log(e);
+        toast.error("Có lỗi xảy ra khi tìm kiếm người dùng");
+        setLoading(false);
+      }
+      // Không set loading = false ở đây vì fetchBorrowCardsForUser sẽ xử lý
+    }
+  };
+
+  // Xử lý khi quét barcode sách thành công
+  const handleBarcodeScanSuccess = async (decodedText, scanType) => {
+    console.log("Barcode scanned:", decodedText);
+    if (scanType === "barcode") {
+      setShowBarcodeScanner(false);
+      // Tìm sách con theo barcode
+      setLoading(true);
+      try {
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/bookchild/barcode/${decodedText}`,
+          {
+            method: "GET",
+          }
+        );
+        if (!response.ok) {
+          window.alert("Không tìm thấy sách với barcode: " + decodedText);
+          setLoading(false);
+          return;
+        }
+        const childBook = await response.json();
+        setResultChild(childBook);
+        toast.success("Quét barcode sách thành công!");
+        setLoading(false);
+      } catch (e) {
+        console.log(e);
+        toast.error("Có lỗi xảy ra khi tìm kiếm sách");
+        setLoading(false);
+      }
+    }
+  };
+  //hàm lấy phiếu mượn
+  const fetchBorrowCardsForUser = useCallback(async (userId) => {
+    console.log("🔍 fetchBorrowCardsForUser called with userId:", userId);
+    console.log("🔍 lastFetchedUserId.current:", lastFetchedUserId.current);
+    console.log("🔍 isFetchingRef.current:", isFetchingRef.current);
+    
+    if (!userId) {
+      console.log("❌ No userId provided");
+      return;
+    }
+    
+    // Kiểm tra xem đang fetch hay đã fetch cho userId này chưa
+    if (isFetchingRef.current) {
+      console.log("⏳ Already fetching, skipping...");
+      return;
+    }
+    
+    if (lastFetchedUserId.current === userId) {
+      console.log("✅ Already fetched borrow cards for user", userId);
+      return;
+    }
+    
+    console.log("🚀 Fetching borrow cards for user", userId);
+    isFetchingRef.current = true;
+    lastFetchedUserId.current = userId;
+    setLoading(true);
+    try {
+      var response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/borrow-cards/user/${userId}`,
+        {
+          method: "POST",
+        }
+      );
+      if (!response.ok) {
+        console.log("Không tìm thấy phiếu mượn nào");
+        setLoading(false);
+        return;
+      }
+      if (response.length === 0) {
+        window.alert("Không tìm thấy phiếu mượn nào");
+        setLoading(false);
+        return;
+      }
+      const res = await response.json();
+      setBorrowCard(res);
+    } catch (e) {
+      console.log("Lỗi khi tìm phiếu mượn của user ", userId, ": ", e);
+    } finally {
+      isFetchingRef.current = false;
+      setLoading(false);
+    }
+  }, []); // Empty dependency array - hàm này không bị tạo lại
+  const fetchBookInfo = async (bookId) => {
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/book/${bookId}`
+    );
+    const data = await res.json();
+    console.log(data);
+    return data;
+  };
+  const getBookIdsInfo = async () => {
+    if (currentChoose?.status === "Đã yêu cầu") {
+      if (currentChoose?.borrowedBooks?.length > 0) {
+        try {
+          const books = await Promise.all(
+            currentChoose.borrowedBooks.map(async (bookId) => {
+              const data = await fetchBookInfo(bookId.bookId);
+              return { ...data, checked: false };
+            })
+          );
+          console.log(books);
+          setInfo(books);
+        } catch (error) {
+          console.error("Lỗi khi tải thông tin sách:", error);
+        }
+      }
+    } else {
+      if (currentChoose?.borrowedBooks?.length > 0) {
+        try {
+          const books = await Promise.all(
+            currentChoose.borrowedBooks.map(async (bookId) => {
+              const childBook = bookId;
+              const data = await fetchBookInfo(bookId.bookId);
+              return { ...data, childId: childBook, checked: false };
+            })
+          );
+          console.log(books);
+          setInfo(books);
+        } catch (error) {
+          console.error("Lỗi khi tải thông tin sách:", error);
+        }
+      }
+    }
+  };
+  useEffect(() => {
+    if (currentChoose && !resultChild) {
+      getBookIdsInfo();
+    } else if (currentChoose && resultChild) {
+    } else {
+      setInfo(null);
+    }
+  }, [currentChoose]);
+
+  const handleGoBack = () => {
+    setResult(null);
+    setSelectedFile(null);
+    setText("");
+    setLoading(false);
+    setBorrowCard(null);
+    lastFetchedUserId.current = null;
+  };
+  const BookInfo = ({ book }) => {
+    return (
+      <div
+        className={`w-full h-[200px] flex justify-between items-center rounded-xl ${
+          book?.checked === false ? "bg-gray-200" : "bg-green-100"
+        } my-3 px-5`}
+      >
+        <div className="flex flex-col mr-4">
+          <p
+            className={`font-semibold ${
+              currentChoose?.status !== "Đã yêu cầu" ? "" : "hidden"
+            }`}
+          >
+            Id:&nbsp;{book?.maSach}
+          </p>
+          <p className="font-semibold">Tên: {book?.tenSach}</p>
+          <p>Tên tác giả: {book?.tenTacGia}</p>
+          <p>Tên NXB: {book?.nxb}</p>
+          <p>Vị trí:&nbsp;{book?.viTri}</p>
+        </div>
+        <img src={book?.hinhAnh[0]} width={140} height={140} />
+      </div>
+    );
+  };
+  const CardInfo = ({ card }) => {
+    return (
+      <div>
+        <p>
+          <strong>Id phiếu mượn:</strong>&nbsp;{card?.id}
+        </p>
+        <p>
+          <strong>Ngày đăng ký mượn:</strong>&nbsp;
+          {format(new Date(card?.borrowDate), "dd/MM/yyyy HH:mm:ss")}
+        </p>
+        <p className={`${card?.status === "Đã yêu cầu" ? "" : "hidden"}`}>
+          <strong>Ngày lấy sách dự kiến:</strong>&nbsp;
+          {format(new Date(card?.getBookDate), "dd/MM/yyyy HH:mm:ss")}
+        </p>
+        <p className={`${card?.status === "Đã yêu cầu" ? "hidden" : ""}`}>
+          <strong>Ngày trả sách dự kiến:</strong>&nbsp;
+          {format(
+            new Date(
+              card?.dueDate ? card?.dueDate : "2025-01-01T10:15:16.696+00:00"
+            ),
+            "dd/MM/yyyy HH:mm:ss"
+          )}
+        </p>
+        <p>
+          <strong>Trạng thái:</strong>&nbsp;{card?.status}
+        </p>
+      </div>
+    );
+  };
+  const BorrowCard = ({ card }) => {
+    return (
+      <div
+        className="w-5/6 my-2 px-10 py-5 bg-white rounded-lg hover:cursor-pointer drop-shadow-md"
+        onClick={() => setCurrent(card)}
+      >
+        <CardInfo card={card} />
+      </div>
+    );
+  };
+  useEffect(() => {
+    console.log("resultChild", resultChild);
+    if (resultChild && resultChild?.bookId) {
+      if (currentChoose?.status === "Đã yêu cầu") {
+        const parentId = resultChild.bookId;
+        const foundBook = currentInfo.find((book) => book.maSach === parentId);
+        if (!foundBook) {
+          window.alert("Sách cha không tồn tại trong danh sách!");
+          setResultChild(null); // Reset sau khi xử lý
+          return;
+        }
+        if (foundBook.checked) {
+          window.alert("Sách cha đã được chọn!");
+          setResultChild(null); // Reset sau khi xử lý
+          return;
+        }
+        const updatedBooks = currentInfo.map((book) =>
+          book.maSach === parentId ? { ...book, checked: true } : book
+        );
+        setInfo(updatedBooks);
+        // Push barcode thay vì id vì backend cần barcode
+        children.push(resultChild.barcode);
+        setResultChild(null); // Reset sau khi xử lý thành công
+      } else {
+        // Trả sách - so sánh với childBookId (là String)
+        const childId = resultChild.id;
+        console.log("Tìm sách con với ID:", childId);
+        console.log("Danh sách sách hiện tại:", currentInfo);
+        
+        // ✅ Kiểm tra currentInfo có null không
+        if (!currentInfo || !Array.isArray(currentInfo)) {
+          console.error("currentInfo không hợp lệ:", currentInfo);
+          window.alert("Danh sách sách không hợp lệ!");
+          return;
+        }
+        
+        const foundBook = currentInfo.find(
+          (book) => {
+            // childId có thể là object hoặc string
+            const bookChildId = typeof book.childId === 'object' 
+              ? book.childId?.childBookId 
+              : book.childId;
+            console.log("So sánh:", bookChildId, "===", childId);
+            return bookChildId === childId || bookChildId === String(childId);
+          }
+        );
+        
+        if (!foundBook) {
+          console.error("Không tìm thấy sách với childBookId:", childId);
+          window.alert("Sách không tồn tại trong danh sách đã mượn!");
+          setResultChild(null); // Reset sau khi xử lý
+          return;
+        }
+        if (foundBook.checked) {
+          window.alert("Sách này đã được chọn!");
+          setResultChild(null); // Reset sau khi xử lý
+          return;
+        }
+        const updatedBooks = currentInfo.map((book) => {
+          const bookChildId = typeof book.childId === 'object'
+            ? book.childId?.childBookId
+            : book.childId;
+          return bookChildId === childId || bookChildId === String(childId)
+            ? { ...book, checked: true }
+            : book;
+        });
+        setInfo(updatedBooks);
+        setResultChild(null); // Reset sau khi xử lý thành công
+      }
+    }
+  }, [resultChild]);
+  useEffect(() => {
+    if (currentInfo?.length > 0) {
+      // ✅ Với trả sách: cho phép hoàn tất ngay cả khi chưa quét hết
+      // Với mượn sách: phải quét đủ tất cả sách
+      const isReturning = currentChoose?.status === "Đang mượn" || currentChoose?.status === "Đã hết hạn";
+      
+      if (isReturning) {
+        // Trả sách: cho phép hoàn tất nếu ít nhất 1 sách đã được check
+        const atLeastOneChecked = currentInfo.some((book) => book.checked === true);
+        setDone(atLeastOneChecked);
+        console.log("Trả sách - atLeastOneChecked:", atLeastOneChecked);
+      } else {
+        // Mượn sách: phải quét đủ tất cả sách
+        const allChecked = currentInfo.every((book) => book.checked === true);
+        setDone(allChecked);
+        console.log("Mượn sách - allChecked:", allChecked);
+      }
+    } else {
+      setDone(false); // reset nếu danh sách rỗng
+    }
+  }, [currentInfo, currentChoose]);
+  const handleCloseCard = () => {
+    setCurrent(null);
+    setInfo(null);
+    setResultChild(null);
+    setDone(false);
+  };
+  const handleUpdateBorrowCard = async () => {
+    setLoading(true);
+    try {
+      let response;
+      console.log(children)
+      if (currentChoose.status === "Đã yêu cầu") {
+        // MƯỢN SÁCH: gọi API /borrow với danh sách barcode
+        response = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/borrow-cards/borrow/${currentChoose?.id}`,
+          {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(children),
+          }
+        );
+        setChildren([])
+        console.log(children)
+      } else {
+        // TRẢ SÁCH: gọi API /return-one cho từng sách đã check
+        const checkedBooks = currentInfo.filter(book => book.checked);
+        
+        for (const book of checkedBooks) {
+          // ✅ Lấy barcode đúng: có thể là string hoặc nested object
+          let barcode;
+          if (typeof book.childId === 'object' && book.childId?.childBookId) {
+            barcode = book.childId.childBookId;
+          } else if (typeof book.childId === 'string') {
+            barcode = book.childId;
+          } else {
+            console.error("Không xác định được barcode từ book:", book);
+            continue;
+          }
+          
+          console.log("Trả sách với barcode:", barcode);
+          
+          const returnResponse = await fetch(
+            `${process.env.NEXT_PUBLIC_API_URL}/api/borrow-cards/return-one/${currentChoose?.id}`,
+            {
+              method: "PUT",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ barcode: String(barcode) }),
+            }
+          );
+          
+          if (!returnResponse.ok) {
+            const errorText = await returnResponse.text();
+            throw new Error(`Không thể trả sách ${barcode}: ${errorText}`);
+          }
+        }
+        
+        response = { ok: true }; // Đánh dấu thành công
+        setChildren([])
+        console.log("Đã trả các sách:", checkedBooks.map(b => b.childId))
+      }
+
+      if (!response.ok) {
+        window.alert("Không thể cập nhật phiếu mượn");
+      } else {
+        window.alert("Updated");
+        
+        // ✅ Refresh dữ liệu trước
+        await getBorrowCard();
+        
+        // ✅ Nếu đang trả sách, reload lại thông tin phiếu mượn để cập nhật
+        if (currentChoose.status === "Đang mượn" || currentChoose.status === "Đã hết hạn") {
+          // Tìm phiếu mượn đã cập nhật từ server
+          const response = await fetch(
+            `${process.env.NEXT_PUBLIC_API_URL}/api/borrow-cards/${currentChoose.id}`,
+            { method: "GET" }
+          );
+          
+          if (response.ok) {
+            const updatedCard = await response.json();
+            setCurrent(updatedCard); // Cập nhật currentChoose với data mới
+            // getBookIdsInfo sẽ tự động chạy lại nhờ useEffect
+          } else {
+            handleCloseCard(); // Nếu lỗi thì đóng modal
+          }
+        } else {
+          handleCloseCard(); // Mượn sách xong thì đóng modal
+        }
+      }
+    } catch (error) {
+      console.error(error);
+      window.alert(error.message || "Có lỗi xảy ra khi cập nhật");
     } finally {
       setLoading(false);
     }
@@ -308,149 +770,152 @@ const ScanPage = () => {
   // Render
 
   return (
-    <div className="flex w-full min-h-screen h-full flex-col gap-2 items-center bg-[#EFF3FB]">
+    <>
       <Toaster position="top-center" />
 
       {/* LOADING SCREEN */}
-      {(userLoading || (cardsLoading && !userResult && !borrowCards.length)) && ( // Điều chỉnh điều kiện loading
-        <div className="flex w-full h-screen justify-center items-center">
-          <ThreeDot color="#062D76" size="large" text="Đang xử lý..." textColor="#062D76" />
-        </div>
+      {(userLoading || (cardsLoading && !userResult && !borrowCards.length)) && (
+      <div className="flex w-full h-screen justify-center items-center">
+        <ThreeDot color="#062D76" size="large" text="Đang xử lý..." textColor="#062D76" />
+      </div>
       )}
 
-      {/* STEP 1: SCAN USER */}
-      {!userResult && !userLoading && (
+      {/* STEP 1: SCAN USER hoặc màn hình chính */}
+      {(!userResult && !userLoading)
+        ? (
         <div className="flex flex-col items-center h-auto w-fit mt-10 mb-10 gap-5 px-10 py-6 bg-white rounded-lg drop-shadow-lg">
           <Link href="/">
-            <img width={200} height={100} src="/images/logoN.png" alt="Logo" className="object-contain" />
+          <img width={200} height={100} src="/images/logoN.png" alt="Logo" className="object-contain" />
           </Link>
-          <p className="text-3xl font-bold text-[#062D76]">Thư Viện Số</p>
-          <p className="text-lg text-gray-600">Quét mã thành viên để bắt đầu</p>
+          <p className="text-3xl font-semibold text-#062D76">Library Web</p>
+          <p className="text-xl font-semibold w-fit">
+          Vui lòng nhập mã người dùng của bạn
+          </p>
+          <div className="flex flex-col w-full items-center justify-center gap-1">
+          <input
+            type="text"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Nhập user ID của bạn"
+            className="bg-white rounded w-fit"
+            onKeyDown={(e) => e.key === "Enter" && handleEnter()}
+          />
+          <p className="text-sm italic text-[#062D76]">
+            Nhập Enter để tiến hành tìm kiếm
+          </p>
+          </div>
 
-          <div className="flex flex-col w-full gap-3">
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                placeholder="Nhập User ID..."
-                className="border p-2 rounded flex-1 outline-none focus:border-[#062D76]"
-                onKeyDown={(e) => e.key === "Enter" && searchUser(text)}
-              />
-              <Button onClick={() => searchUser(text)}>Tìm</Button>
-            </div>
+          <p className="text-2xl font-semibold mt-6">Hoặc</p>
 
-            <div className="relative flex items-center py-2">
-              <div className="flex-grow border-t border-gray-300"></div>
-              <span className="flex-shrink-0 mx-4 text-gray-400">Hoặc tải ảnh barcode</span>
-              <div className="flex-grow border-t border-gray-300"></div>
-            </div>
+          {/* Nút quét QR code */}
+          <button
+          onClick={() => setShowQRScanner(true)}
+          className="flex items-center gap-2 px-6 py-3 bg-[#062D76] text-white rounded-lg hover:bg-[#04204F] transition-colors"
+          >
+          <QrCode size={24} />
+          <span className="font-semibold">Quét mã QR người dùng</span>
+          </button>
 
-            <div className="flex flex-col gap-2">
-              <label className="flex items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-gray-50">
-                <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                  <p className="text-sm text-gray-500">Nhấn để chọn ảnh</p>
-                </div>
-                <input type="file" className="hidden" onChange={handleUploadFile} />
-              </label>
-            </div>
+          <p className="text-2xl font-semibold mt-10">Hoặc</p>
+          <p className="text-xl font-semibold ">
+          Tải ảnh barcode mã người dùng của bạn
+          </p>
+          <div className="flex gap-5">
+          <input
+            type="file"
+            onChange={onFileChange}
+            className="bg-white self-center rounded"
+          />
+          <Button onClick={handleUpload}>Tải ảnh lên</Button>
           </div>
         </div>
-      )}
-
-      {/* STEP 2: USER DASHBOARD */}
-      {userResult && (
+        )
+        : (
         <div className="flex flex-col w-full h-full min-h-screen items-center py-6 gap-5 bg-[#EFF3FB]">
-          {/* Back Button */}
-          <div className="absolute top-5 left-5 md:left-20">
-            <Button onClick={handleGoBack} className="bg-[#062D76] rounded-full w-10 h-10 p-0">
-              <Undo2 className="w-5 h-5 text-white" />
-            </Button>
+          {/*Nút Back*/}
+          <div className="fixed top-5 left-5 md:left-57">
+          <Button
+            title={"Quay Lại"}
+            className="bg-[#062D76] rounded-3xl w-10 h-10"
+            onClick={() => {
+            handleGoBack();
+            }}
+          >
+            <Undo2 className="w-12 h-12" color="white" />
+          </Button>
           </div>
-
-          <UserInfoSection user={userResult} />
-
-          <div className="w-full px-4 md:px-20 lg:px-40 grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
-            {/* List: Đã yêu cầu */}
-            <div className="flex flex-col gap-4">
-              <div className="flex items-center gap-3 bg-white p-4 rounded-xl text-[#062D76]">
-                <Book size={24} />
-                <h2 className="font-bold text-lg">Phiếu mượn cần lấy sách</h2>
+          {/*Phiếu mượn đang chọn*/}
+          {currentChoose && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div
+            className="w-full h-full bg-black opacity-[80%] absolute top-0 left-0"
+            onClick={() => handleCloseCard()}
+            ></div>
+            <div className="flex lg:w-2/3 h-[400px] w-fit lg:h-[600px] bg-white p-6 rounded-lg shadow-lg justify-between py-10 relative">
+            <div className="flex flex-col w-1/2 mr-4">
+              <CardInfo card={currentChoose} />
+              <div className="h-[400px] overflow-y-auto flex flex-col items-center">
+              {currentInfo?.map((book, index) => {
+                return <BookInfo book={book} key={index} />;
+              })}
               </div>
-              <div className="flex flex-col items-center w-full">
-                {borrowCards.filter(c => c.status === "Đã yêu cầu").length === 0 && <p className="text-gray-400 mt-4">Trống</p>}
-                {borrowCards
-                  .filter(c => c.status === "Đã yêu cầu")
-                  .map(card => <BorrowCardItem key={card.id} card={card} onClick={setCurrentCard} />)
-                }
-              </div>
-            </div>
-
-            {/* List: Đang mượn */}
-            <div className="flex flex-col gap-4">
-              <div className="flex items-center gap-3 bg-white p-4 rounded-xl text-[#062D76]">
-                <CalendarClock size={24} />
-                <h2 className="font-bold text-lg">Phiếu đang mượn (Trả sách)</h2>
-              </div>
-              <div className="flex flex-col items-center w-full">
-                {borrowCards.filter(c => c.status === "Đang mượn").length === 0 && <p className="text-gray-400 mt-4">Trống</p>}
-                {borrowCards
-                  .filter(c => c.status === "Đang mượn")
-                  .map(card => <BorrowCardItem key={card.id} card={card} onClick={setCurrentCard} />)
-                }
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* STEP 3: SCAN BOOKS MODAL */}
-      {currentCard && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={handleCloseModal}>
-          <div className="bg-white rounded-xl w-full max-w-5xl h-[80vh] flex flex-col lg:flex-row overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
-
-            {/* Left: Book List */}
-            <div className="flex-1 p-6 flex flex-col border-r border-gray-100 bg-gray-50">
-              <h3 className="font-bold text-xl text-[#062D76] mb-4">
-                {currentCard.status === "Đã yêu cầu" ? "Xác nhận lấy sách" : "Xác nhận trả sách"}
-              </h3>
-              <div className="flex-1 overflow-y-auto pr-2">
-                {booksInfo.map((book, idx) => (
-                  <BookItem key={idx} book={book} isHiddenId={currentCard.status !== "Đã yêu cầu"} />
-                ))}
-              </div>
-              <div className="mt-4 pt-4 border-t border-gray-200">
-                <Button
-                  className="w-full bg-[#062D76] hover:bg-blue-800 text-white h-12 text-lg font-bold disabled:opacity-50"
-                  disabled={!isAllChecked}
-                  onClick={handleUpdateCard}
-                >
-                  {currentCard.status === "Đã yêu cầu" ? "Hoàn tất mượn" : "Hoàn tất trả"}
-                </Button>
-              </div>
-            </div>
-
-            {/* Right: Scanner */}
-            <div className="flex-1 p-6 flex flex-col items-center justify-center bg-white relative">
-              <UploadChild resultChild={scannedChild} setResultChild={setScannedChild} />
-              <p className="mt-4 text-gray-500 italic text-sm text-center">
-                Quét mã vạch trên sách để xác nhận. <br />
-                Trạng thái sẽ tự động cập nhật bên trái.
-              </p>
-              <button
-                onClick={handleCloseModal}
-                className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+              <Button
+              className="self-center w-fit flex z-100 bg-[#062D76] hover:bg-white hover:text-[#062D76] text-white rounded-lg mt-4"
+              disabled={!done}
+              onClick={() => {
+                handleUpdateBorrowCard();
+              }}
               >
-                ✕ Đóng
-              </button>
+              Hoàn tất
+              </Button>
             </div>
-
+            <div className="flex flex-col ml-4 w-1/2 items-center justify-center">
+              <UploadChild
+              resultChild={resultChild}
+              setResultChild={setResultChild}
+              onOpenBarcodeScanner={() => setShowBarcodeScanner(true)}
+              />
+            </div>
+            <p className="absolute bottom-5 flex text-white italic z-100 text-sm">
+              Nhấn vào khoảng trống để đóng
+            </p>
+            </div>
+          </div>
+          )}
+          <div className="relative flex items-center py-2">
+          <div className="flex-grow border-t border-gray-300"></div>
+          <span className="flex-shrink-0 mx-4 text-gray-400">Hoặc tải ảnh barcode</span>
+          <div className="flex-grow border-t border-gray-300"></div>
+          </div>
+          <div className="flex flex-col gap-2">
+          <label className="flex items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-gray-50">
+            <div className="flex flex-col items-center justify-center pt-5 pb-6">
+            <p className="text-sm text-gray-500">Nhấn để chọn ảnh</p>
+            </div>
+            <input type="file" className="hidden" onChange={handleUploadFile} />
+          </label>
           </div>
         </div>
-      )}
+        )}
 
-    </div>
-  );
+      {/* Modal quét QR code người dùng */}
+      <CameraScanner
+      isOpen={showQRScanner}
+      scanType="qrcode"
+      onScanSuccess={(decodedText) => handleQRScanSuccess(decodedText, "qrcode")}
+      onClose={() => setShowQRScanner(false)}
+      />
+
+      {/* Modal quét barcode sách */}
+      <CameraScanner
+      isOpen={showBarcodeScanner}
+      scanType="barcode"
+      onScanSuccess={(decodedText) => handleBarcodeScanSuccess(decodedText, "barcode")}
+      onClose={() => setShowBarcodeScanner(false)}
+      />
+
+    </>
+    );
 };
 
 export default ScanPage;

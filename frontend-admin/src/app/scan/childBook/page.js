@@ -3,8 +3,9 @@ import React, { useState } from "react";
 import { Button } from "@/app/components/ui/button"; // Đảm bảo đường dẫn import đúng
 import { ThreeDot } from "react-loading-indicators";
 import toast from "react-hot-toast";
+import { Scan } from "lucide-react";
 
-const UploadChild = ({ resultChild, setResultChild }) => {
+const UploadChild = ({ resultChild, setResultChild, onOpenBarcodeScanner }) => {
   const [selectedFile, setSelectedFile] = useState(null);
 
   // 7. Rename loading -> isUploading / isSearching
@@ -124,28 +125,68 @@ const UploadChild = ({ resultChild, setResultChild }) => {
           />
         </div>
       ) : (
-        <>
-          {/* Nếu đã có kết quả trả về, hiển thị thông báo nhỏ (Optional) */}
-          {resultChild && (
-            <div className="p-2 bg-green-100 text-green-700 rounded mb-2 w-full text-center text-sm">
-              Đang chọn sách ID: <strong>{resultChild.id}</strong>
-            </div>
+        <div className="flex flex-col w-full justify-center items-center h-[10px] mb-10 gap-5 px-10 py-6 ">
+          <p className="text-xl font-semibold ">Vui lòng nhập mã sách</p>
+          <div className="flex flex-col w-full items-center justify-center gap-1">
+            <input
+              type="text"
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="Nhập ID sách"
+              className="bg-white rounded w-fit border-1"
+              onKeyDown={(e) => e.key === "Enter" && handleEnter()}
+            />
+            <p className="text-sm italic text-[#062D76]">
+              Nhập Enter để tiến hành tìm kiếm
+            </p>
+          </div>
+
+          <p className="text-2xl font-semibold mt-6">Hoặc</p>
+
+          {/* Nút quét barcode sách */}
+          {onOpenBarcodeScanner && (
+            <button
+              onClick={onOpenBarcodeScanner}
+              className="flex items-center gap-2 px-6 py-3 bg-[#062D76] text-white rounded-lg hover:bg-[#04204F] transition-colors shadow-md"
+            >
+              <Scan size={24} />
+              <span className="font-semibold">Quét barcode sách</span>
+            </button>
           )}
 
-          <div className="flex flex-col w-full items-center gap-4">
-            {/* Cách 1: Nhập tay */}
-            <div className="w-full">
-              <p className="text-sm font-semibold text-[#062D76] mb-2">Nhập mã sách thủ công</p>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={text}
-                  onChange={(e) => setText(e.target.value)}
-                  placeholder="VD: 12345"
-                  className="flex-1 p-2 border rounded-md outline-none focus:border-[#062D76] text-sm"
-                  onKeyDown={(e) => e.key === "Enter" && handleEnter()}
-                />
-                <Button onClick={handleEnter} className="bg-[#062D76] h-auto">Tìm</Button>
+          <p className="text-2xl font-semibold mt-6">Hoặc</p>
+          <p className="text-xl font-semibold ">Tải ảnh barcode mã sách</p>
+          <div className="flex gap-0">
+            <input type="file" onChange={onFileChange} />
+            <Button onClick={handleUpload}>Tải ảnh lên</Button>
+          </div>
+        </div>
+      )}
+      {/*
+        <div className="flex flex-col w-full h-full min-h-screen items-center h-[10px] py-6 gap-5 bg-[#EFF3FB]">
+          <div className="flex flex-col bg-white w-1/2 rounded-lg mt-2 drop-shadow-lg p-5 gap-10 items-center">
+            <h1>ID Sách:&nbsp;{result?.childBook?.id}</h1>
+            <div className="flex space-x-20 items-center">
+              <img
+                src={`${result?.parentBook?.hinhAnh[0]}`}
+                className="w-[145px] h-[205px] rounded"
+              />
+              <div className="flex flex-col gap-[10px] w-full">
+                <p className="font-bold">
+                  Tên sách:&nbsp;{result?.parentBook?.tenSach}
+                </p>
+                <p className="">
+                  Tên tác giả:&nbsp;{result?.parentBook?.tenTacGia}
+                </p>
+                <p className="">Nhà xuất bản:&nbsp;{result?.parentBook?.nxb}</p>
+                <p className="">Năm xuất bản:&nbsp;{result?.parentBook?.nam}</p>
+                <p className="">
+                  Còn sẵn:&nbsp;
+                  {result?.parentBook?.tongSoLuong -
+                    result?.parentBook?.soLuongMuon -
+                    result?.parentBook?.soLuongXoa}
+                </p>
+
               </div>
             </div>
 

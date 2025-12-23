@@ -99,7 +99,7 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
        <head>
         <Script src="https://cdn.lordicon.com/lordicon.js" strategy="beforeInteractive" />
         <link
@@ -112,6 +112,7 @@ export default function RootLayout({ children }) {
         />
       </head>
       <body
+        suppressHydrationWarning
         className={`${geistSans.variable} ${geistMono.variable} antialiased flex`}
       >
         <div className="z-1">
