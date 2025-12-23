@@ -22,6 +22,8 @@ import BellIcon from "./BellIcon";
 import AccountIcon from "./AccountIcon";
 import SearchIcon from "./SearchIcon";
 import { Sun, Moon } from "lucide-react";
+import { useCart } from "@/app/context/CartContext";
+import { useNotification } from "@/app/context/NotificationContext";
 // Header hoặc component cha
 
 
@@ -62,11 +64,16 @@ const Header = () => {
   const pathname = usePathname();
   const router = useRouter();
 
-  const [cartCount, setCartCount] = useState(0);
-  const [notifications, setNotifications] = useState([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const { cartCount } = useCart();
+
+  const {
+    unreadCount,
+    updateUnreadCount,
+    notifications,
+    loading,
+    error
+  } = useNotification();
+
   const [isHovered, setIsHovered] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [suggestions, setSuggestions] = useState([]);
@@ -249,8 +256,11 @@ const DarkModeToggle = () => {
   };
 
   const [readStatus, setReadStatus] = useState(() => {
-    const saved = localStorage.getItem("notificationReadStatus");
-    return saved ? JSON.parse(saved) : {};
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("notificationReadStatus");
+      return saved ? JSON.parse(saved) : {};
+    }
+    return {};
   });
 
   useEffect(() => {
@@ -391,10 +401,7 @@ const DarkModeToggle = () => {
     }
   };
 
-  useEffect(() => {
-    fetchCart();
-    fetchNotifications();
-  }, [user.id]);
+
 
   const handleLogout = () => {
     localStorage.removeItem("accessToken");
@@ -403,7 +410,17 @@ const DarkModeToggle = () => {
   };
 
   const handleNotificationClick = (notificationId, link) => {
+    const wasRead = !!readStatus[notificationId];
+
+    // Cập nhật local state trong Header
     setReadStatus((prev) => ({ ...prev, [notificationId]: true }));
+
+    // Cập nhật số lượng trên Context nếu chưa đọc
+    if (!wasRead) {
+      const newCount = Math.max(0, unreadCount - 1);
+      updateUnreadCount(newCount);
+    }
+
     router.push(link);
   };
 
