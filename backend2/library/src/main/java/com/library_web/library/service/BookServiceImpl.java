@@ -265,14 +265,15 @@ public class BookServiceImpl implements BookService {
                     }
 
                     case "hinhAnh" -> {
-                        if (value instanceof List<?>) {
-                            List<String> imgs = ((List<?>) value).stream()
-                                    .map(Object::toString)
+                        if (value instanceof List<?> list) {
+                            List<String> imgs = list.stream()
+                                    .filter(Objects::nonNull) 
+                                    .map(val -> String.valueOf(val)) 
+                                    .filter(s -> !s.isEmpty() && !s.equals("null")) 
                                     .toList();
                             book.setHinhAnh(imgs);
                         } else {
-                            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                                    "Danh sách hình ảnh không hợp lệ: " + value);
+                            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Trường hinhAnh phải là một danh sách (Array)");
                         }
                     }
                     case "categoryChildId" -> {

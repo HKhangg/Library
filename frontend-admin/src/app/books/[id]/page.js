@@ -16,6 +16,7 @@ import { fetcher } from "@/lib/fetcher";
 axios.defaults.baseURL = process.env.NEXT_PUBLIC_API_URL;
 
 function Page() {
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
   const { id } = useParams();
 
@@ -29,82 +30,94 @@ function Page() {
   const [publisher, setPublisher] = useState("");
   const [year, setYear] = useState("");
   const [quantity, setQuantity] = useState("");
+  const [originQuantity, setOriginQuantity] = useState(0);
   const [description, setDescription] = useState("");
-  const [category, setCategory] = useState(""); // Tên thể loại chính
-  const [category2, setCategory2] = useState(""); // Tên thể loại phụ
+  const [category, setCategory] = useState(null);
+  const [category2, setCategory2] = useState(null);
   const [weight, setWeight] = useState("");
   const [price, setPrice] = useState("");
-  const [status, setStatus] = useState(""); // Trạng thái sách
+  const [status, setStatus] = useState("");
 
+  const [errors, setErrors] = useState({
+    year: false,
+    quantity: false,
+    weight: false,
+    price: false,
+  });
+
+  // State ảnh
   const [image, setImage] = useState(
     Array(4).fill({ filePreview: null, selectedFile: null })
   );
 
+  // Danh sách categories
+  const [totalCate, setTotalCate] = useState([]);
+  const [cateList, setCateList] = useState([]);
+  const [cate2List, setCate2List] = useState([]);
+
+  // Dropdown
   const [isCateListOpen, setIsCateListOpen] = useState(false);
   const [isCateList2Open, setIsCateList2Open] = useState(false);
+  const openCategoryList = () => setIsCateListOpen((o) => !o);
+  const openCategory2List = () => setIsCateList2Open((o) => !o);
 
-  const { data: totalCate = [], isLoading: loadingCategories } = useSWR(
-    `${process.env.NEXT_PUBLIC_API_URL}/api/category`,
-    fetcher,
-    {
-      revalidateOnFocus: false,
-      dedupingInterval: 60000,
-    }
-  );
 
-  // useSWR: Lấy chi tiết Sách
-  const { data: bookData, isLoading: loadingBook, mutate: mutateBook } = useSWR(
-    id ? `${process.env.NEXT_PUBLIC_API_URL}/api/book/${id}` : null,
-    fetcher,
-    {
-      revalidateOnFocus: false,
-    }
-  );
+  const { data: totalCateData } = useSWR('/api/category', fetcher);
+const bookUrl = id ? `/api/book/${id}` : null;
+const { data: bookData, isLoading: isBookLoading } = useSWR(bookUrl, fetcher);
 
-  // Populate Data vào Form 
-  useEffect(() => {
-    if (bookData) {
-      setStatus(bookData.trangThai || "");
-      setBookname(bookData.tenSach || "");
-      setAuthor(bookData.tenTacGia || "");
-      setPublisher(bookData.nxb || "");
-      setYear(bookData.nam?.toString() || "");
-      // Logic riêng cho số lượng: Input để trống để nhập số lượng thêm
-      setQuantity("");
-      setDescription(bookData.moTa || "");
+useEffect(() => {
+  if (totalCateData) {
+    setTotalCate(totalCateData);
+    setCateList(totalCateData.map((c) => c.name));
+  }
+}, [totalCateData]);
 
-      // Populate Categories
-      setCategory(bookData.categoryChild?.parent?.name || "");
-      setCategory2(bookData.categoryChild?.name || "");
 
-      setWeight(bookData.trongLuong?.toString() || "");
-      setPrice(bookData.donGia?.toString() || "");
 
-      // Populate Images
-      setImage((prev) =>
-        prev.map((_, idx) => ({
-          filePreview: bookData.hinhAnh?.[idx] || null,
-          selectedFile: null,
-        }))
-      );
-    }
-  }, [bookData]);
+  // Refs
+  const isFirstRender = useRef(true);
+  const fileRefs = [useRef(), useRef(), useRef(), useRef()];
 
-  // Derived State cho Categories
-  const cateList = useMemo(() => totalCate.map((c) => c.name), [totalCate]);
-
-  const cate2List = useMemo(() => {
-    if (!category) return [];
-    const selectedCate = totalCate.find((c) => c.name === category);
-    return selectedCate?.children?.map((ch) => ch.name) || [];
-  }, [category, totalCate]);
-
-  const isDeleted = status === "DA_XOA";
-  const loading = loadingCategories || loadingBook;
-
-  // Handlers
+  // Back
   const handleGoBack = () => router.back();
 
+  const isDeleted = status === "DA_XOA";
+
+  useEffect(() => {
+  if (bookData) {
+    setStatus(bookData.trangThai || "");
+    setBookname(bookData.tenSach || "");
+    setAuthor(bookData.tenTacGia || "");
+    setPublisher(bookData.nxb || "");
+    setYear(bookData.nam?.toString() || "");
+    setOriginQuantity(bookData.tongSoLuong || 0);
+    setDescription(bookData.moTa || "");
+    setCategory(bookData.categoryChild?.parent?.name || null);
+    setCategory2(bookData.categoryChild?.name || null);
+    setWeight(bookData.trongLuong?.toString() || "");
+    setPrice(bookData.donGia?.toString() || "");
+    setImage(prev => prev.map((_, idx) => ({
+      filePreview: bookData.hinhAnh?.[idx] || null,
+      selectedFile: null,
+    })));
+  }
+}, [bookData]);
+
+  // ==== UPDATE cate2List khi thay cate cha ====
+  useEffect(() => {
+    if (category) {
+      const sel = totalCate.find((c) => c.name === category);
+      setCate2List(sel?.children.map((ch) => ch.name) || []);
+    }
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    setCategory2(null);
+  }, [category, totalCate]);
+
+  // ==== XỬ LÝ FILE CHANGE ====
   const handleFileChange = (index, e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -118,24 +131,32 @@ function Page() {
     });
   };
 
+  // ==== UPLOAD ẢNH ====
   const uploadImagesToCloudinary = async () => {
     const formData = new FormData();
-    let hasFile = false;
+    let has = false;
     image.forEach((img) => {
       if (img.selectedFile) {
         formData.append("files", img.selectedFile);
-        hasFile = true;
+        has = true;
       }
     });
-
-    if (!hasFile) return [];
-
-    const res = await axios.post(
-      `${process.env.NEXT_PUBLIC_API_URL}/api/upload/image`,
-      formData,
-      { headers: { "Content-Type": "multipart/form-data" } }
-    );
+    if (!has) return [];
+    const res = await axios.post("/api/upload/image", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
     return res.data;
+  };
+
+  const handleValidation = () => {
+    const newErrors = {
+      year: year && (isNaN(+year) || +year <= 0),
+      quantity: quantity && (isNaN(+quantity) || +quantity < 0),
+      weight: weight && (isNaN(+weight) || +weight <= 0),
+      price: price && (isNaN(+price) || +price <= 0),
+    };
+    setErrors(newErrors);
+    return !Object.values(newErrors).some((error) => error);
   };
 
   const handleSubmit = async () => {
@@ -143,126 +164,146 @@ function Page() {
       toast.error("ID sách không hợp lệ");
       return;
     }
-
-    // Validation cơ bản
-    if (
-      !bookname || !author || !year || !publisher ||
-      !description || !category || !category2 || !weight || !price
-    ) {
-      toast.error("Vui lòng điền đầy đủ thông tin");
+    if (!handleValidation()) {
+      toast.error("Vui lòng điền đúng thông tin");
       return;
     }
 
-    // Xử lý logic khôi phục sách nếu đã xóa
     if (isDeleted) {
       const newQ = +quantity;
       if (isNaN(newQ) || newQ <= 0) {
-        toast.error("Số lượng khôi phục phải > 0");
+        toast.error("Số lượng phải > 0");
         return;
       }
-
-      const toastId = toast.loading("Đang khôi phục sách...");
+      setLoading(true);
       try {
-        await axios.patch(`${process.env.NEXT_PUBLIC_API_URL}/api/book/${id}`, { tongSoLuong: newQ });
-
-        // Refresh lại data
-        mutateBook();
-
-        toast.success("Sách đã được phục hồi thành công", { id: toastId });
-        setTimeout(() => router.back(), 1000);
+        await axios.patch(`/api/book/${id}`, { tongSoLuong: newQ });
+        toast.success("Sách đã được phục hồi thành công");
+        router.back();
       } catch (err) {
-        console.error("Lỗi:", err);
-        toast.error("Khôi phục thất bại", { id: toastId });
+        console.error("Lỗi chi tiết:", err.response?.data || err.message);
+        toast.error(err.response?.data?.message || "Lỗi server");
+      } finally {
+        setLoading(false);
       }
       return;
     }
 
-    // Xử lý logic CẬP NHẬT SÁCH
-    const addQty = quantity === "" ? 0 : +quantity; // Nếu không nhập thì coi là 0 (không thêm)
+    const initialData = (await axios.get(`/api/book/${id}`)).data;
+    const addQty = +quantity;
     if (isNaN(addQty) || addQty < 0) {
       toast.error("Số lượng thêm phải >= 0");
       return;
     }
-
-    // So sánh sự thay đổi để tạo payload
+    
     const bookUpdates = {};
-    if (bookname !== bookData.tenSach) bookUpdates.tenSach = bookname;
-    if (description !== bookData.moTa) bookUpdates.moTa = description;
-    if (author !== bookData.tenTacGia) bookUpdates.tenTacGia = author;
-    if (publisher !== bookData.nxb) bookUpdates.nxb = publisher;
-    if (+year !== bookData.nam) bookUpdates.nam = +year;
-    if (+weight !== bookData.trongLuong) bookUpdates.trongLuong = +weight;
-    if (+price !== bookData.donGia) bookUpdates.donGia = +price;
+
+    if (bookname && bookname !== initialData.tenSach)
+      bookUpdates.tenSach = bookname;
+    if (description && description !== initialData.moTa)
+      bookUpdates.moTa = description;
+    if (author && author !== initialData.tenTacGia)
+      bookUpdates.tenTacGia = author;
+    if (publisher && publisher !== initialData.nxb) bookUpdates.nxb = publisher;
+    if (year && !isNaN(+year) && +year !== initialData.nam)
+      bookUpdates.nam = +year;
+    if (weight && !isNaN(+weight) && +weight !== initialData.trongLuong)
+      bookUpdates.trongLuong = +weight;
+    if (price && !isNaN(+price) && +price !== initialData.donGia)
+      bookUpdates.donGia = +price;
 
     bookUpdates.tongSoLuong = addQty;
 
-    // Logic cập nhật Category
     if (category2) {
-      const selParent = totalCate.find((c) => c.name === category);
-      const selChild = selParent?.children.find((ch) => ch.name === category2);
-
-      if (selChild && selChild.id !== bookData.categoryChild?.id) {
-        bookUpdates.categoryChildId = selChild.id;
+      const sel = totalCate
+        .find((c) => c.name === category)
+        ?.children.find((ch) => ch.name === category2);
+      if (sel && sel.id !== initialData.categoryChild?.id) {
+        bookUpdates.categoryChildId = sel.id;
       }
     }
 
-    if (Object.keys(bookUpdates).length === 0 && addQty === 0 && !image.some(i => i.selectedFile)) {
+    const updates = {
+      book: Object.keys(bookUpdates).length > 0 ? bookUpdates : {},
+      quantity: +quantity || initialData.tongSoLuong || 0,
+    };
+
+    if (Object.keys(bookUpdates).length === 0) {
       toast("Không có thay đổi nào để cập nhật", { icon: "⚠️" });
       return;
     }
 
-    const toastId = toast.loading("Đang cập nhật sách...");
-
+    // Upload ảnh nếu có
+    let newImgs = [];
     try {
-      // Upload ảnh nếu có
-      let newImgs = await uploadImagesToCloudinary();
+      newImgs = await uploadImagesToCloudinary();
+      // Chỉ gán hinhAnh khi upload thực sự có file mới
       if (Array.isArray(newImgs) && newImgs.length > 0) {
         bookUpdates.hinhAnh = newImgs;
       }
+    } catch {
+      toast.error("Upload ảnh thất bại");
+      return;
+    }
 
-      // Gửi request cập nhật
-      await axios.patch(`${process.env.NEXT_PUBLIC_API_URL}/api/book/${id}`, bookUpdates);
-
-      // Refresh SWR
-      mutateBook();
-
-      toast.success("Cập nhật sách thành công", { id: toastId });
-
+    setLoading(true);
+    try {
+      await axios.patch(`/api/book/${id}`, bookUpdates);
+      mutate(`/api/book/${id}`); 
+      mutate('/api/book');
+      toast.success("Cập nhật sách thành công");
+      router.push(`/books/details/${id}`);
     } catch (err) {
-      console.error("Lỗi:", err);
-      const msg = err.response?.data?.message || "Cập nhật thất bại";
-      toast.error(msg, { id: toastId });
+      console.error("Lỗi chi tiết:", err.response?.data || err.message);
+      toast.error(err.response?.data?.message || "Lỗi server rồi bà");
+    } finally {
+      setLoading(false);
     }
   };
 
+  if (loading) {
+    return (
+      <div className="flex">
+        <Sidebar />
+        <div className="md:ml-52 flex-1 flex items-center justify-center min-h-screen">
+          <ThreeDot
+            color="#062D76"
+            size="large"
+            text="Loading..."
+            variant="bounce"
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-row w-full h-full min-h-screen bg-[#EFF3FB] pb-15">
-      <Toaster position="top-center" reverseOrder={false} />
       <Sidebar />
       {loading ? (
         <div className="flex md:ml-52 w-full h-screen justify-center items-center">
           <ThreeDot
             color="#062D76"
             size="large"
-            text="Đang tải dữ liệu..."
+            text="Vui lòng chờ"
             variant="bounce"
             textColor="#062D76"
           />
         </div>
       ) : (
         <div className="flex w-full flex-col py-6 md:ml-52 relative mt-10 gap-2 items-center px-10">
-          {/* Nút Quay Lại */}
-          <div className="absolute top-5 left-5 md:left-57 fixed z-10">
+          {/* Nút Back */}
+          <div className="absolute top-5 left-5 md:left-57 fixed">
             <Button
               title={"Quay Lại"}
-              className="bg-[#062D76] rounded-3xl w-10 h-10 hover:bg-gray-700"
+              className="bg-[#062D76] rounded-3xl w-10 h-10"
               onClick={handleGoBack}
             >
               <Undo2 className="w-12 h-12" color="white" />
             </Button>
           </div>
 
-          {/* Form Fields */}
+          {/* Form nhập liệu */}
           <div className="flex flex-col w-full gap-[5px] md:gap-[10px]">
             <p className="font-semibold text-lg mt-3">Tên Sách</p>
             <Input
@@ -314,39 +355,34 @@ function Page() {
 
           <div className="flex w-full justify-between gap-10">
             <div className="flex flex-col w-2/3 gap-[5px] md:gap-[10px]">
-              <p className="font-semibold text-lg mt-3">
-                {isDeleted ? "Số lượng khôi phục" : "Số Sách Thêm (Nhập 0 nếu không thêm)"}
-              </p>
+              <p className="font-semibold text-lg mt-3">Số Sách Thêm</p>
               <Input
                 type="number"
-                placeholder="Nhập số lượng"
+                placeholder="Nhập số sách muốn thêm"
                 className="font-semibold rounded-lg w-full h-10 flex items-center px-5 bg-white"
                 value={quantity}
                 onChange={(e) => setQuantity(e.target.value)}
               />
             </div>
-
-            {/* Dropdown Category Parent */}
             <div className="flex flex-col w-full gap-[5px] md:gap-[10px] space-y-2 relative inline-block text-left">
               <p className="font-semibold text-lg mt-3">Thể Loại Chính</p>
               <Button
                 title={"Thể Loại Chính"}
                 className="bg-white text-black rounded-lg w-full h-10 hover:bg-gray-300 flex justify-between"
-                onClick={() => setIsCateListOpen(!isCateListOpen)}
+                onClick={openCategoryList}
                 disabled={isDeleted}
               >
                 {category || "Chọn Thể Loại Chính"}
                 <ChevronDown className="w-12 h-12" color="#062D76" />
               </Button>
               {isCateListOpen && (
-                <div className="absolute bg-white rounded-lg w-full z-50 shadow-lg max-h-60 overflow-y-auto">
+                <div className="absolute bg-white rounded-lg w-full z-50 shadow-lg">
                   {cateList.map((cate, index) => (
                     <Button
                       key={index}
                       className="flex justify-start block w-full px-4 py-2 text-left bg-white text-black hover:bg-gray-300 items-center gap-2"
                       onClick={() => {
                         setCategory(cate);
-                        setCategory2(""); // Reset con khi cha thay đổi
                         setIsCateListOpen(false);
                       }}
                     >
@@ -356,49 +392,44 @@ function Page() {
                 </div>
               )}
             </div>
-
-            {/* Dropdown Category Child */}
             <div className="flex flex-col w-full gap-[5px] md:gap-[10px] space-y-2 relative inline-block text-left">
               <p className="font-semibold text-lg mt-3">Thể Loại Phụ</p>
               <Button
                 title={"Thể Loại Phụ"}
                 className="bg-white text-black rounded-lg w-full h-10 hover:bg-gray-300 flex justify-between"
-                onClick={() => setIsCateList2Open(!isCateList2Open)}
-                disabled={isDeleted || !category}
+                onClick={openCategory2List}
+                disabled={isDeleted}
               >
                 {category2 || "Chọn Thể Loại Phụ"}
                 <ChevronDown className="w-12 h-12" color="#062D76" />
               </Button>
               {isCateList2Open && (
-                <div className="absolute bg-white rounded-lg w-full z-50 shadow-lg max-h-60 overflow-y-auto">
-                  {cate2List.length > 0 ? (
-                    cate2List.map((cate, index) => (
-                      <Button
-                        key={index}
-                        className="flex justify-start block w-full px-4 py-2 text-left bg-white text-black hover:bg-gray-300 items-center gap-2"
-                        onClick={() => {
-                          setCategory2(cate);
-                          setIsCateList2Open(false);
-                        }}
-                      >
-                        {cate}
-                      </Button>
-                    ))
-                  ) : (
-                    <p className="p-2 text-gray-500 text-center">Không có danh mục con</p>
-                  )}
+                <div className="absolute bg-white rounded-lg w-full z-50 shadow-lg">
+                  {cate2List.map((cate, index) => (
+                    <Button
+                      key={index}
+                      className="flex justify-start block w-full px-4 py-2 text-left bg-white text-black hover:bg-gray-300 items-center gap-2"
+                      onClick={() => {
+                        setCategory2(cate);
+                        setIsCateList2Open(false);
+                      }}
+                    >
+                      {cate}
+                    </Button>
+                  ))}
                 </div>
               )}
             </div>
           </div>
-
           <div className="flex w-full justify-between gap-10">
             <div className="flex flex-col w-2/3 gap-[5px] md:gap-[10px]">
               <p className="font-semibold text-lg mt-3">Trọng Lượng (gram)</p>
               <Input
                 type="number"
                 placeholder="Nhập trọng lượng"
-                className="font-semibold rounded-lg w-full h-10 px-5 bg-white"
+                className={`font-semibold rounded-lg w-full h-10 flex items-center px-5 bg-white ${
+                  errors.weight ? "border-red-500" : ""
+                }`}
                 disabled={isDeleted}
                 value={weight}
                 onChange={(e) => setWeight(e.target.value)}
@@ -409,7 +440,9 @@ function Page() {
               <Input
                 type="number"
                 placeholder="Nhập đơn giá"
-                className="font-semibold rounded-lg w-full h-10 px-5 bg-white"
+                className={`font-semibold rounded-lg w-full h-10 flex items-center px-5 bg-white ${
+                  errors.price ? "border-red-500" : ""
+                }`}
                 disabled={isDeleted}
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
@@ -432,52 +465,133 @@ function Page() {
           <div className="flex flex-col w-full gap-[5px] md:gap-[10px]">
             <p className="font-semibold text-lg mt-3">Hình ảnh</p>
             <div className="grid grid-cols-4 gap-4">
-              {[0, 1, 2, 3].map((index) => (
-                <div key={index} className="flex flex-col space-y-3">
-                  {image[index].filePreview ? (
-                    <img
-                      src={image[index].filePreview}
-                      className="w-[290px] h-[410px] rounded-lg object-cover"
-                      alt={`Ảnh ${index}`}
-                    />
-                  ) : (
-                    <div className="w-[290px] h-[410px] bg-gray-300 rounded-lg flex justify-center items-center text-gray-700">
-                      Không có hình ảnh
-                    </div>
-                  )}
-                  <Button
-                    className="flex w-[290px] bg-[#062D76] hover:bg-gray-700"
+              <div className="flex flex-col space-y-3">
+                {image[0].filePreview ? (
+                  <img
+                    src={image[0].filePreview}
+                    className="w-[290px] h-[410px] rounded-lg"
+                    width={145}
+                    height={205}
+                    alt={"Ảnh Bìa"}
+                  />
+                ) : (
+                  <div className="w-[290px] h-[410px] bg-gray-300 rounded-lg flex justify-center items-center text-gray-700">
+                    Không có hình ảnh
+                  </div>
+                )}
+                <Button
+                  className="flex w-[290px] bg-[#062D76]"
+                  onClick={() => fileInputRef.current.click()}
+                >
+                  <ArrowUpFromLine className="w-12 h-12" color="white" />
+                  Tải Ảnh Bìa
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => handleFileChange(0, e)}
+                    ref={fileInputRef}
+                  />
+                </Button>
+              </div>
+              <div className="flex flex-col space-y-3">
+                {image[1].filePreview ? (
+                  <img
+                    src={image[1].filePreview}
+                    className="w-[290px] h-[410px] rounded-lg"
+                    width={145}
+                    height={205}
+                    alt={"Ảnh Xem Trước 1"}
+                  />
+                ) : (
+                  <div className="w-[290px] h-[410px] bg-gray-300 rounded-lg flex justify-center items-center text-gray-700">
+                    Không có hình ảnh
+                  </div>
+                )}
+                <Button
+                  className="flex w-[290px] bg-[#062D76]"
+                  onClick={() => fileInputRef1.current.click()}
+                >
+                  <ArrowUpFromLine className="w-12 h-12" color="white" />
+                  Tải Ảnh Xem Trước
+                  <input
+                    type="file"
                     disabled={isDeleted}
-                    onClick={() => {
-                      const refs = [fileInputRef, fileInputRef1, fileInputRef2, fileInputRef3];
-                      refs[index].current.click();
-                    }}
-                  >
-                    <ArrowUpFromLine className="w-12 h-12" color="white" />
-                    {index === 0 ? "Tải Ảnh Bìa" : "Tải Ảnh Xem Trước"}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => handleFileChange(index, e)}
-                      ref={
-                        index === 0 ? fileInputRef :
-                          index === 1 ? fileInputRef1 :
-                            index === 2 ? fileInputRef2 :
-                              fileInputRef3
-                      }
-                    />
-                  </Button>
-                </div>
-              ))}
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => handleFileChange(1, e)}
+                    ref={fileInputRef1}
+                  />
+                </Button>
+              </div>
+              <div className="flex flex-col space-y-3">
+                {image[2].filePreview ? (
+                  <img
+                    src={image[2].filePreview}
+                    className="w-[290px] h-[410px] rounded-lg"
+                    width={145}
+                    height={205}
+                    alt={"Ảnh Xem Trước 2"}
+                  />
+                ) : (
+                  <div className="w-[290px] h-[410px] bg-gray-300 rounded-lg flex justify-center items-center text-gray-700">
+                    Không có hình ảnh
+                  </div>
+                )}
+                <Button
+                  className="flex w-[290px] bg-[#062D76]"
+                  onClick={() => fileInputRef2.current.click()}
+                >
+                  <ArrowUpFromLine className="w-12 h-12" color="white" />
+                  Tải Ảnh Xem Trước
+                  <input
+                    type="file"
+                    disabled={isDeleted}
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => handleFileChange(2, e)}
+                    ref={fileInputRef2}
+                  />
+                </Button>
+              </div>
+              <div className="flex flex-col space-y-3">
+                {image[3].filePreview ? (
+                  <img
+                    src={image[3].filePreview}
+                    className="w-[290px] h-[410px] rounded-lg"
+                    width={145}
+                    height={205}
+                    alt={"Ảnh Xem Trước 3"}
+                  />
+                ) : (
+                  <div className="w-[290px] h-[410px] bg-gray-300 rounded-lg flex justify-center items-center text-gray-700">
+                    Không có hình ảnh
+                  </div>
+                )}
+                <Button
+                  className="flex w-[290px] bg-[#062D76]"
+                  onClick={() => fileInputRef3.current.click()}
+                >
+                  <ArrowUpFromLine className="w-12 h-12" color="white" />
+                  Tải Ảnh Xem Trước
+                  <input
+                    type="file"
+                    disabled={isDeleted}
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => handleFileChange(3, e)}
+                    ref={fileInputRef3}
+                  />
+                </Button>
+              </div>
             </div>
           </div>
 
-          <div className="w-full bottom-0 px-10 left-0 md:left-52 md:w-[calc(100%-208px)] fixed h-18 bg-white flex items-center justify-between z-20 shadow-md">
+          <div className="w-full bottom-0 px-10 left-0 md:left-52 md:w-[calc(100%-208px)] fixed h-18 bg-white flex items-center justify-between">
             <div></div>
             <Button
               title={"Hoàn Tất"}
-              className={`rounded-3xl w-40 h-12 bg-[#062D76] hover:bg-gray-700`}
+              className="rounded-3xl w-40 h-12 bg-[#062D76]"
               onClick={handleSubmit}
             >
               <CircleCheck className="w-12 h-12" color="white" />
