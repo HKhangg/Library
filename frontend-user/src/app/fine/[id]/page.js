@@ -69,7 +69,7 @@ function Page() {
   };
   const BookCard = ({ book }) => {
     return (
-      <article className="flex grow shrink gap-3 min-w-60 bg-white rounded-xl shadow-[0px_2px_2px_rgba(0,0,0,0.25)] p-5">
+      <article className="flex grow shrink gap-3 min-w-60 z-100 bg-white rounded-xl shadow-[0px_2px_2px_rgba(0,0,0,0.25)] p-5">
         <img
           src={book.hinhAnh[0]}
           alt={book.tenSach}
@@ -109,7 +109,7 @@ function Page() {
   return (
     <main className="flex flex-col min-h-screen text-foreground">
       <div className="pt-16 flex">
-        <section className="self-stretch pr-[1.25rem] md:pl-60 ml-[1.25rem] my-auto w-full max-md:max-w-full mt-2 mb-2">
+        <section className="self-stretch z-100 pr-[1.25rem] md:pl-60 ml-[1.25rem] my-auto w-full max-md:max-w-full mt-2 mb-2">
           {/*Nút Back - Floating Button*/}
           {/*Nút Back*/}
           <div className="mb-2 fixed z-50 flex justify-between items-center">

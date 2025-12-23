@@ -117,7 +117,7 @@ const ChangePassword = () => {
     <div className="flex flex-1 min-h-screen justify-center items-center pt-20 -mr-[180px]">
       <Toaster position="top-center" toastOptions={{ duration: 5000 }} />
       <LeftSideBar />
-      <div className="flex-1 max-w-7xl mx-auto w-full flex">
+      <div className="flex-1 max-w-7xl mx-auto z-100 w-full flex">
         <form
           onSubmit={handleSubmit(onSubmit)}
           className="bg-white mx-auto h-[500px] p-10 rounded-lg shadow-md"
